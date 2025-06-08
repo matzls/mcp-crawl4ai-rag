@@ -47,18 +47,71 @@ The Crawl4AI RAG MCP server is just the beginning. Here's where we're headed:
 
 ## Tools
 
-The server provides essential web crawling and search tools:
+The server provides 5 powerful tools for web crawling and intelligent content retrieval:
 
 ### Core Tools (Always Available)
 
-1. **`crawl_single_page`**: Quickly crawl a single web page and store its content in the vector database
-2. **`smart_crawl_url`**: Intelligently crawl a full website based on the type of URL provided (sitemap, llms-full.txt, or a regular webpage that needs to be crawled recursively)
-3. **`get_available_sources`**: Get a list of all available sources (domains) in the database
-4. **`perform_rag_query`**: Search for relevant content using semantic search with optional source filtering
+#### 1. `crawl_single_page(url: str)`
+Crawls a single web page and stores its content in the PostgreSQL database. This tool is ideal for quickly retrieving content from a specific URL without following links.
+
+- **Use case**: Quick content acquisition from specific pages
+- **Process**: Converts HTML to clean markdown, chunks content intelligently (respects code blocks and paragraphs)
+- **Storage**: Stores chunks in PostgreSQL with vector embeddings for semantic search
+- **Code extraction**: Extracts and processes code examples if `USE_AGENTIC_RAG=true`
+- **Returns**: Chunk count, code examples stored, content length, word count, source info
+
+#### 2. `smart_crawl_url(url: str, max_depth: int = 3, max_concurrent: int = 10, chunk_size: int = 5000)`
+Intelligently detects URL type and applies the appropriate crawling strategy. This is the most powerful crawling tool that adapts to different content sources.
+
+- **URL Detection**:
+  - **Sitemaps** (*.xml): Extracts all URLs and crawls them in parallel
+  - **Text files** (*.txt): Direct content retrieval (useful for llms.txt files)
+  - **Web pages**: Recursive crawling of internal links up to specified depth
+- **Parallel processing**: Configurable concurrency with memory-adaptive dispatcher
+- **Smart chunking**: Respects code blocks, paragraphs, and sentence boundaries
+- **Returns**: Crawl type, pages crawled, chunks stored, code examples, source updates
+
+#### 3. `get_available_sources()`
+Lists all crawled sources (domains) with summaries and metadata. Essential for discovering what content is available before performing targeted searches.
+
+- **Use case**: Discovery and source filtering preparation
+- **Information provided**: Source IDs, AI-generated summaries, word counts, timestamps
+- **Best practice**: Always use this before calling RAG query tools with source filtering
+- **Returns**: Complete source catalog with statistics
+
+#### 4. `perform_rag_query(query: str, source: str = None, match_count: int = 5)`
+Performs semantic search across stored content using vector similarity. The core RAG tool for finding relevant information.
+
+- **Search capabilities**:
+  - **Vector search**: Semantic similarity using OpenAI embeddings (text-embedding-3-small)
+  - **Hybrid search**: Combines vector + keyword search if `USE_HYBRID_SEARCH=true`
+  - **Source filtering**: Optional filtering by specific domain/source
+  - **Reranking**: Cross-encoder reranking if `USE_RERANKING=true`
+- **Advanced features**: Smart result combination, similarity scoring, metadata preservation
+- **Returns**: Ranked content chunks with similarity scores, search mode info, reranking status
 
 ### Conditional Tools
 
-5. **`search_code_examples`** (requires `USE_AGENTIC_RAG=true`): Search specifically for code examples and their summaries from crawled documentation. This tool provides targeted code snippet retrieval for AI coding assistants.
+#### 5. `search_code_examples(query: str, source_id: str = None, match_count: int = 5)`
+**Available only when `USE_AGENTIC_RAG=true`**
+
+Specialized search for code examples with AI-generated summaries. This tool provides targeted code snippet retrieval specifically designed for AI coding assistants.
+
+- **Code extraction**: Identifies code blocks ≥300 characters with surrounding context
+- **AI summaries**: Each code example gets an intelligent summary via LLM
+- **Dual search**: Searches both code content and summaries for comprehensive coverage
+- **Same advanced features**: Supports hybrid search and reranking like regular RAG
+- **Use case**: Finding specific implementations, patterns, or usage examples
+- **Returns**: Code blocks with summaries, source info, similarity scores
+
+### Tool Workflow
+
+The typical workflow combines multiple tools:
+
+1. **Crawl content**: Use `crawl_single_page` or `smart_crawl_url` to index websites
+2. **Discover sources**: Use `get_available_sources` to see what's available
+3. **Search content**: Use `perform_rag_query` for general content or `search_code_examples` for code-specific queries
+4. **Iterate**: Refine searches with source filtering based on discovered sources
 
 ## Prerequisites
 
