@@ -5,7 +5,6 @@ This server provides tools to crawl websites using Crawl4AI, automatically detec
 the appropriate crawl method based on URL type (sitemap, txt file, or regular webpage).
 """
 from mcp.server.fastmcp import FastMCP, Context
-from sentence_transformers import CrossEncoder
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -25,15 +24,15 @@ import concurrent.futures
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, MemoryAdaptiveDispatcher
 
 from utils import (
-    create_postgres_pool, 
-    add_documents_to_postgres, 
+    create_postgres_pool,
+    add_documents_to_postgres,
     search_documents,
     extract_code_blocks,
     generate_code_example_summary,
     add_code_examples_to_postgres,
     update_source_info,
     extract_source_summary,
-    search_code_examples
+    search_code_examples as search_code_examples_util
 )
 
 # Load environment variables from the project root .env file
@@ -49,7 +48,7 @@ class Crawl4AIContext:
     """Context for the Crawl4AI MCP server."""
     crawler: AsyncWebCrawler
     postgres_pool: asyncpg.Pool
-    reranking_model: Optional[CrossEncoder] = None
+    reranking_model: Optional[Any] = None  # CrossEncoder when available
 
 @asynccontextmanager
 async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
@@ -79,6 +78,7 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     reranking_model = None
     if os.getenv("USE_RERANKING", "false") == "true":
         try:
+            from sentence_transformers import CrossEncoder
             reranking_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
         except Exception as e:
             print(f"Failed to load reranking model: {e}")
@@ -104,7 +104,7 @@ mcp = FastMCP(
     port=os.getenv("PORT", "8051")
 )
 
-def rerank_results(model: CrossEncoder, query: str, results: List[Dict[str, Any]], content_key: str = "content") -> List[Dict[str, Any]]:
+def rerank_results(model: Any, query: str, results: List[Dict[str, Any]], content_key: str = "content") -> List[Dict[str, Any]]:
     """
     Rerank search results using a cross-encoder model.
     
@@ -529,6 +529,7 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
         
         # Extract and process code examples from all documents only if enabled
         extract_code_examples_enabled = os.getenv("USE_AGENTIC_RAG", "false") == "true"
+        code_examples = []  # Initialize to empty list
         if extract_code_examples_enabled:
             all_code_blocks = []
             code_urls = []
@@ -843,7 +844,7 @@ async def search_code_examples(ctx: Context, query: str, source_id: str = None, 
             # Hybrid search: combine vector and keyword search
             
             # 1. Get vector search results (get more to account for filtering)
-            vector_results = await search_code_examples(
+            vector_results = await search_code_examples_util(
                 pool=postgres_pool,
                 query=query,
                 match_count=match_count * 2,  # Get double to have room for filtering
@@ -915,7 +916,7 @@ async def search_code_examples(ctx: Context, query: str, source_id: str = None, 
             
         else:
             # Standard vector search only
-            results = await search_code_examples(
+            results = await search_code_examples_util(
                 pool=postgres_pool,
                 query=query,
                 match_count=match_count,

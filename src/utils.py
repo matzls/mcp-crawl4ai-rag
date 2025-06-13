@@ -131,10 +131,10 @@ def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
 def create_embedding(text: str) -> List[float]:
     """
     Create an embedding for a single text using OpenAI's API.
-    
+
     Args:
         text: Text to create an embedding for
-        
+
     Returns:
         List of floats representing the embedding
     """
@@ -145,6 +145,18 @@ def create_embedding(text: str) -> List[float]:
         print(f"Error creating embedding: {e}")
         # Return empty embedding if there's an error
         return [0.0] * 1536
+
+def embedding_to_vector_string(embedding: List[float]) -> str:
+    """
+    Convert a Python list embedding to PostgreSQL vector string format.
+
+    Args:
+        embedding: List of floats representing the embedding
+
+    Returns:
+        String representation suitable for PostgreSQL vector type
+    """
+    return '[' + ','.join(map(str, embedding)) + ']'
 
 def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, bool]:
     """
@@ -356,7 +368,7 @@ async def add_documents_to_postgres(
                             data["content"],
                             json.dumps(data["metadata"]),
                             data["source_id"],
-                            data["embedding"]
+                            embedding_to_vector_string(data["embedding"])
                         )
                 # Success - break out of retry loop
                 break
@@ -382,7 +394,7 @@ async def add_documents_to_postgres(
                                     record["content"],
                                     json.dumps(record["metadata"]),
                                     record["source_id"],
-                                    record["embedding"]
+                                    embedding_to_vector_string(record["embedding"])
                                 )
                                 successful_inserts += 1
                             except Exception as individual_error:
@@ -422,7 +434,7 @@ async def search_documents(
             # Call the match_crawled_pages function
             result = await conn.fetch(
                 "SELECT * FROM match_crawled_pages($1, $2, $3, $4)",
-                query_embedding,
+                embedding_to_vector_string(query_embedding),
                 match_count,
                 filter_json,
                 source_filter
@@ -665,7 +677,7 @@ async def add_code_examples_to_postgres(
                             data['summary'],
                             json.dumps(data['metadata']),
                             data['source_id'],
-                            data['embedding']
+                            embedding_to_vector_string(data['embedding'])
                         )
                 # Success - break out of retry loop
                 break
@@ -692,7 +704,7 @@ async def add_code_examples_to_postgres(
                                     record['summary'],
                                     json.dumps(record['metadata']),
                                     record['source_id'],
-                                    record['embedding']
+                                    embedding_to_vector_string(record['embedding'])
                                 )
                                 successful_inserts += 1
                             except Exception as individual_error:
@@ -839,7 +851,7 @@ async def search_code_examples(
             # Call the match_code_examples function
             result = await conn.fetch(
                 "SELECT * FROM match_code_examples($1, $2, $3, $4)",
-                query_embedding,
+                embedding_to_vector_string(query_embedding),
                 match_count,
                 filter_json,
                 source_filter
