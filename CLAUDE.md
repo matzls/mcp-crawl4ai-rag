@@ -194,6 +194,8 @@ uv run src/crawl4ai_mcp.py
 - [x] Setup project structure and MCP server implementation (2025-01-08)
 - [x] Document project architecture in CLAUDE.md (2025-01-08) - TASK-001
 - [x] Add fork maintenance strategy and commands (2025-01-08) - TASK-008
+- [x] Add comprehensive end-to-end testing plan and MCP Inspector setup (2025-01-08) - TASK-009
+- [x] Update documentation to reflect PostgreSQL 17 configuration (2025-01-08) - TASK-010
 
 ### Backlog
 <!-- Future tasks and improvements -->
