@@ -4,7 +4,7 @@
   <em>Web Crawling and RAG Capabilities for AI Agents and AI Coding Assistants</em>
 </p>
 
-A powerful implementation of the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) integrated with [Crawl4AI](https://crawl4ai.com) and PostgreSQL for providing AI agents and AI coding assistants with advanced web crawling and RAG capabilities.
+A powerful implementation of the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) integrated with [Crawl4AI](https://crawl4ai.com), PostgreSQL, and [Pydantic AI](https://ai.pydantic.dev) for providing AI agents and AI coding assistants with advanced web crawling, RAG capabilities, and intelligent agent orchestration.
 
 With this MCP server, you can <b>scrape anything</b> and then <b>use that knowledge anywhere</b> for RAG.
 
@@ -14,7 +14,11 @@ The primary goal is to bring this MCP server into [Archon](https://github.com/co
 
 ## Overview
 
-This MCP server provides tools that enable AI agents to crawl websites, store content in a vector database (PostgreSQL with pgvector), and perform RAG over the crawled content. It follows the best practices for building MCP servers based on the [Mem0 MCP server template](https://github.com/coleam00/mcp-mem0/) I provided on my channel previously.
+This project provides both an MCP server and intelligent agent capabilities:
+
+**MCP Server**: Provides tools that enable AI agents to crawl websites, store content in a vector database (PostgreSQL with pgvector), and perform RAG over the crawled content. It follows the best practices for building MCP servers based on the [Mem0 MCP server template](https://github.com/coleam00/mcp-mem0/) I provided on my channel previously.
+
+**Pydantic AI Agents**: Intelligent agent layer that connects to the MCP server as a client, providing structured workflows, type-safe dependency injection, and multi-step reasoning capabilities for complex crawling and RAG operations.
 
 The server includes several advanced RAG strategies that can be enabled to enhance retrieval quality:
 - **Contextual Embeddings** for enriched semantic understanding
@@ -40,12 +44,20 @@ The Crawl4AI RAG MCP server is just the beginning. Here's where we're headed:
 
 ## Features
 
+### MCP Server Capabilities
 - **Smart URL Detection**: Automatically detects and handles different URL types (regular webpages, sitemaps, text files)
 - **Recursive Crawling**: Follows internal links to discover content
 - **Parallel Processing**: Efficiently crawls multiple pages simultaneously
 - **Content Chunking**: Intelligently splits content by headers and size for better processing
 - **Vector Search**: Performs RAG over crawled content, optionally filtering by data source for precision
 - **Source Retrieval**: Retrieve sources available for filtering to guide the RAG process
+
+### Pydantic AI Agent Capabilities
+- **Intelligent Workflow Orchestration**: Combines multiple MCP tools for complex multi-step operations
+- **Type-Safe Configuration**: Structured dependency injection with Pydantic models
+- **Structured Outputs**: Validated responses with comprehensive metadata
+- **Agent Specialization**: Dedicated agents for crawling, RAG queries, and workflow orchestration
+- **MCP Client Integration**: Seamless connection to MCP server using documented patterns
 
 ## Tools
 
@@ -115,6 +127,74 @@ The typical workflow combines multiple tools:
 3. **Search content**: Use `perform_rag_query` for general content or `search_code_examples` for code-specific queries
 4. **Iterate**: Refine searches with source filtering based on discovered sources
 
+## Pydantic AI Agents
+
+The project includes intelligent agents that connect to the MCP server as clients, providing higher-level orchestration capabilities:
+
+### Agent Types
+
+#### `create_crawl_agent(server_url: str = "http://localhost:8051/sse")`
+Specialized agent for web crawling operations with intelligent strategy selection.
+
+```python
+from pydantic_agent import create_crawl_agent, CrawlDependencies
+
+# Create crawling agent
+agent = create_crawl_agent()
+dependencies = CrawlDependencies()
+
+# Run intelligent crawling workflow
+async with agent.run_mcp_servers():
+    result = await agent.run(
+        "Crawl the Python documentation and extract all tutorial content",
+        deps=dependencies
+    )
+```
+
+#### `create_rag_agent(server_url: str = "http://localhost:8051/sse")`
+Focused on content retrieval and semantic search operations.
+
+```python
+from pydantic_agent import create_rag_agent, RAGDependencies
+
+# Create RAG agent
+agent = create_rag_agent()
+dependencies = RAGDependencies()
+
+# Run intelligent search workflow
+async with agent.run_mcp_servers():
+    result = await agent.run(
+        "Find information about Python async/await patterns and provide examples",
+        deps=dependencies
+    )
+```
+
+#### `create_workflow_agent(server_url: str = "http://localhost:8051/sse")`
+Orchestrates complex multi-step operations combining crawling and RAG.
+
+```python
+from pydantic_agent import create_workflow_agent, WorkflowDependencies
+
+# Create workflow agent
+agent = create_workflow_agent()
+dependencies = WorkflowDependencies()
+
+# Run complex multi-step workflow
+async with agent.run_mcp_servers():
+    result = await agent.run(
+        "Research FastAPI documentation, extract key concepts, and create a knowledge base for API development questions",
+        deps=dependencies
+    )
+```
+
+### Agent Features
+
+- **Structured Outputs**: All agents return validated Pydantic models (CrawlResult, RAGResult, WorkflowResult)
+- **Type-Safe Dependencies**: Configuration through typed dependency injection
+- **Tool Registration**: Uses `@agent.tool` decorators with `RunContext` for dependency access
+- **MCP Integration**: Follows documented patterns with `MCPServerHTTP` and `agent.run_mcp_servers()`
+- **Error Handling**: Graceful error handling with informative error messages
+
 ## Prerequisites
 
 - [Python 3.12+](https://www.python.org/downloads/) with [uv package manager](https://docs.astral.sh/uv/)
@@ -149,7 +229,37 @@ The typical workflow combines multiple tools:
    crawl4ai-setup
    ```
 
+   This will install all required dependencies including:
+   - `crawl4ai==0.6.2` - Web crawling capabilities
+   - `mcp>=1.9.4` - Model Context Protocol framework
+   - `pydantic-ai[logfire]>=0.2.18` - Intelligent agent framework
+   - `asyncpg==0.30.0` - PostgreSQL async driver
+   - `openai>=1.86.0` - OpenAI API integration
+   - `sentence-transformers>=4.1.0` - Embedding models
+
 5. Create a `.env` file based on the configuration section below
+
+## Project Structure
+
+```
+mcp-crawl4ai-rag/
+├── src/
+│   ├── crawl4ai_mcp.py          # Main MCP server implementation
+│   ├── utils.py                 # Database and RAG utilities
+│   └── pydantic_agent/          # Intelligent agent layer
+│       ├── __init__.py          # Agent exports
+│       ├── agent.py             # Agent factory functions and MCP integration
+│       ├── dependencies.py     # Type-safe dependency injection models
+│       ├── outputs.py           # Structured output validation models
+│       ├── tools.py             # Agent tool implementations
+│       └── examples/            # Usage examples and workflows
+│           ├── basic_crawl_example.py
+│           └── rag_workflow_example.py
+├── crawled_pages.sql            # PostgreSQL schema
+├── pyproject.toml               # Project dependencies
+├── .env                         # Environment configuration
+└── start_mcp_server.sh          # Optimized startup script
+```
 
 ## Database Setup
 
@@ -313,6 +423,73 @@ uv run src/crawl4ai_mcp.py
 
 The server will start and listen on the configured host and port (default: http://localhost:8051/sse).
 
+## Using Pydantic AI Agents
+
+Once the MCP server is running, you can use the Pydantic AI agents for intelligent workflows:
+
+### Basic Agent Usage
+
+```python
+import asyncio
+from pydantic_agent import create_crawl_agent, create_rag_agent, CrawlDependencies, RAGDependencies
+
+async def main():
+    # Create agents
+    crawl_agent = create_crawl_agent("http://localhost:8051/sse")
+    rag_agent = create_rag_agent("http://localhost:8051/sse")
+
+    # Set up dependencies
+    crawl_deps = CrawlDependencies()
+    rag_deps = RAGDependencies()
+
+    # Crawl content
+    async with crawl_agent.run_mcp_servers():
+        crawl_result = await crawl_agent.run(
+            "Crawl https://docs.python.org/3/tutorial/ and index all tutorial content",
+            deps=crawl_deps
+        )
+
+    # Search content
+    async with rag_agent.run_mcp_servers():
+        search_result = await rag_agent.run(
+            "Find information about Python functions and provide examples",
+            deps=rag_deps
+        )
+
+    print(f"Crawled: {crawl_result.data}")
+    print(f"Found: {search_result.data}")
+
+# Run the example
+asyncio.run(main())
+```
+
+### Advanced Workflow Example
+
+```python
+from pydantic_agent import create_workflow_agent, WorkflowDependencies
+
+async def research_workflow():
+    agent = create_workflow_agent()
+    deps = WorkflowDependencies()
+
+    async with agent.run_mcp_servers():
+        result = await agent.run(
+            """
+            Research FastAPI documentation:
+            1. Crawl the main FastAPI docs
+            2. Extract key concepts about dependency injection
+            3. Find code examples for async endpoints
+            4. Create a summary of best practices
+            """,
+            deps=deps
+        )
+
+    return result
+
+# Run advanced workflow
+result = asyncio.run(research_workflow())
+```
+
 ## Integration with MCP Clients
 
 ### SSE Configuration
@@ -420,11 +597,67 @@ npx @modelcontextprotocol/inspector
 # Use crawl_single_page tool with: https://example.com
 ```
 
-## Building Your Own Server
+## Building Your Own Server and Agents
 
-This implementation provides a foundation for building more complex MCP servers with web crawling capabilities. To build your own:
+This implementation provides a foundation for building more complex MCP servers and intelligent agents with web crawling capabilities.
+
+### Extending the MCP Server
+
+To build your own MCP server:
 
 1. Add your own tools by creating methods with the `@mcp.tool()` decorator
 2. Create your own lifespan function to add your own dependencies
 3. Modify the `utils.py` file for any helper functions you need
 4. Extend the crawling capabilities by adding more specialized crawlers
+
+### Creating Custom Agents
+
+To build your own Pydantic AI agents:
+
+1. **Create Agent Factory Functions**:
+   ```python
+   def create_custom_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
+       server = MCPServerHTTP(url=server_url)
+       agent = Agent('openai:gpt-4o', deps_type=CustomDependencies, mcp_servers=[server])
+
+       @agent.tool
+       async def custom_tool(ctx: RunContext[CustomDependencies], param: str) -> str:
+           # Custom tool implementation
+           return f"Processed: {param}"
+
+       return agent
+   ```
+
+2. **Define Custom Dependencies**:
+   ```python
+   @dataclass
+   class CustomDependencies:
+       custom_config: str = "default"
+       # Add your configuration parameters
+   ```
+
+3. **Create Structured Outputs**:
+   ```python
+   class CustomResult(BaseModel):
+       success: bool
+       data: Any
+       metadata: Dict[str, Any]
+   ```
+
+4. **Follow Integration Patterns**: Use the documented MCP client patterns with `agent.run_mcp_servers()` context manager
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+### Development Areas
+
+- **MCP Server Tools**: Add new crawling capabilities or data processing tools
+- **Pydantic AI Agents**: Create specialized agents for specific domains or workflows
+- **Integration Patterns**: Improve MCP client integration and agent orchestration
+- **Documentation**: Enhance examples and usage patterns
+- **Testing**: Add comprehensive test coverage for both MCP tools and agents
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
