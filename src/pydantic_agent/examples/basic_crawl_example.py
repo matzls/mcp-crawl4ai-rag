@@ -17,7 +17,6 @@ from pydantic_ai import Agent
 
 from ..dependencies import CrawlDependencies
 from ..outputs import CrawlResult
-from ..agent import CrawlAgent
 
 
 async def basic_crawl_example():
