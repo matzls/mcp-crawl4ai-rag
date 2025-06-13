@@ -191,20 +191,307 @@ docker run --env-file .env -p 8051:8051 mcp/crawl4ai-rag
 - [x] Migrate from Supabase to PostgreSQL (2025-01-08) - TASK-MIGRATE-001
 - [x] Setup project structure and MCP server implementation (2025-01-08)
 - [x] Document project architecture in CLAUDE.md (2025-01-08) - TASK-001
+- [x] Add fork maintenance strategy and commands (2025-01-08) - TASK-008
 
 ### Backlog
 <!-- Future tasks and improvements -->
-- [ ] Add support for multiple embedding models (Ollama integration)
-- [ ] Implement Context 7-inspired chunking strategy
-- [ ] Performance optimization for crawling speed
-- [ ] Integration with Archon knowledge engine
-- [ ] Enhanced configuration management for RAG strategies
+- [ ] Add support for multiple embedding models (Ollama integration) - TASK-009
+- [ ] Implement Context 7-inspired chunking strategy - TASK-010
+- [ ] Performance optimization for crawling speed - TASK-011
+- [ ] Integration with Archon knowledge engine - TASK-012
+- [ ] Enhanced configuration management for RAG strategies - TASK-013
 
 ### Task Guidelines
 - Each task should have a unique ID (TASK-001, TASK-002, etc.)
 - Include brief description and acceptance criteria
 - Mark completion date when finished
 - Reference task ID in commit messages
+
+## 🧪 End-to-End Testing Plan
+
+### MCP Inspector Setup and Usage
+
+#### Prerequisites for Testing
+1. **MCP Inspector Installation**: Use `npx @modelcontextprotocol/inspector` (no installation required)
+2. **Database Setup**: PostgreSQL with pgvector extension running and accessible
+3. **Environment Configuration**: Complete .env file with all required variables
+4. **Test URLs**: Curated list of test websites for different scenarios
+
+#### MCP Inspector Usage for Our Server
+
+**Option 1: Test with SSE Transport (Recommended)**
+```bash
+# Start our server with SSE transport
+TRANSPORT=sse uv run src/crawl4ai_mcp.py
+
+# In another terminal, run inspector
+npx @modelcontextprotocol/inspector
+# Then connect to: http://localhost:8051/sse
+```
+
+**Option 2: Test with Stdio Transport**
+```bash
+# Run inspector with direct stdio connection
+npx @modelcontextprotocol/inspector uv run src/crawl4ai_mcp.py
+```
+
+**Option 3: Test with Configuration File**
+```bash
+# Create inspector config file and test
+npx @modelcontextprotocol/inspector --config test-config.json --server crawl4ai-rag
+```
+
+### Core Testing Scenarios
+
+#### Test Data URLs
+- **Simple Webpage**: `https://example.com` (basic HTML content)
+- **Documentation Site**: `https://docs.python.org/3/tutorial/` (rich content with code examples)
+- **Sitemap**: `https://docs.python.org/sitemap.xml` (XML sitemap testing)
+- **Text File**: `https://raw.githubusercontent.com/anthropics/anthropic-sdk-python/main/README.md` (direct text content)
+- **JavaScript-Heavy Site**: `https://react.dev/learn` (dynamic content testing)
+
+#### Environment Configurations for Testing
+Create multiple .env configurations to test different RAG strategies:
+
+**Basic Configuration (.env.basic)**
+```
+USE_CONTEXTUAL_EMBEDDINGS=false
+USE_HYBRID_SEARCH=false
+USE_AGENTIC_RAG=false
+USE_RERANKING=false
+```
+
+**Full Features Configuration (.env.full)**
+```
+USE_CONTEXTUAL_EMBEDDINGS=true
+USE_HYBRID_SEARCH=true
+USE_AGENTIC_RAG=true
+USE_RERANKING=true
+```
+
+**Hybrid Only Configuration (.env.hybrid)**
+```
+USE_CONTEXTUAL_EMBEDDINGS=false
+USE_HYBRID_SEARCH=true
+USE_AGENTIC_RAG=false
+USE_RERANKING=true
+```
+
+### Detailed Test Cases
+
+#### Test Suite 1: Tool Availability and Schema Validation
+**Objective**: Verify all tools are properly exposed and have correct schemas
+
+**Test Steps**:
+1. Connect MCP Inspector to server
+2. Navigate to "Tools" tab
+3. Verify all 5 tools are listed:
+   - `crawl_single_page`
+   - `smart_crawl_url`
+   - `get_available_sources`
+   - `perform_rag_query`
+   - `search_code_examples` (only if USE_AGENTIC_RAG=true)
+
+**Success Criteria**:
+- All expected tools appear in the tools list
+- Each tool shows proper parameter schema
+- Tool descriptions are clear and accurate
+- Parameter types and requirements are correctly specified
+
+#### Test Suite 2: crawl_single_page Tool Testing
+**Objective**: Test single page crawling functionality
+
+**Test Case 2.1: Basic Webpage Crawling**
+- **Input**: `url: "https://example.com"`
+- **Expected**: Successful crawl with chunks stored in PostgreSQL
+- **Verify**: Response includes chunk count, content length, source_id
+
+**Test Case 2.2: Documentation Page with Code**
+- **Input**: `url: "https://docs.python.org/3/tutorial/introduction.html"`
+- **Expected**: Rich content extraction with proper chunking
+- **Verify**: Code blocks preserved, headers extracted in metadata
+
+**Test Case 2.3: Invalid URL Handling**
+- **Input**: `url: "https://nonexistent-domain-12345.com"`
+- **Expected**: Graceful error handling
+- **Verify**: Error message returned, no database corruption
+
+**Test Case 2.4: Code Example Extraction (USE_AGENTIC_RAG=true)**
+- **Input**: `url: "https://docs.python.org/3/tutorial/controlflow.html"`
+- **Expected**: Code examples extracted and summarized
+- **Verify**: code_examples_stored > 0 in response
+
+#### Test Suite 3: smart_crawl_url Tool Testing
+**Objective**: Test intelligent URL detection and crawling strategies
+
+**Test Case 3.1: Sitemap Crawling**
+- **Input**: `url: "https://docs.python.org/sitemap.xml", max_depth: 2, max_concurrent: 5`
+- **Expected**: Multiple URLs extracted and crawled in parallel
+- **Verify**: crawl_type: "sitemap", pages_crawled > 1
+
+**Test Case 3.2: Text File Direct Retrieval**
+- **Input**: `url: "https://raw.githubusercontent.com/anthropics/anthropic-sdk-python/main/README.md"`
+- **Expected**: Direct content retrieval without browser rendering
+- **Verify**: crawl_type: "text_file", content properly stored
+
+**Test Case 3.3: Recursive Webpage Crawling**
+- **Input**: `url: "https://docs.python.org/3/tutorial/", max_depth: 2, max_concurrent: 3`
+- **Expected**: Internal links followed up to specified depth
+- **Verify**: crawl_type: "webpage", multiple related pages crawled
+
+**Test Case 3.4: Concurrent Crawling Limits**
+- **Input**: `url: "https://docs.python.org/sitemap.xml", max_concurrent: 1`
+- **Expected**: Crawling respects concurrency limits
+- **Verify**: No overwhelming of target server, proper rate limiting
+
+#### Test Suite 4: get_available_sources Tool Testing
+**Objective**: Verify source discovery and metadata
+
+**Test Case 4.1: Empty Database**
+- **Precondition**: Clean database with no crawled content
+- **Expected**: Empty sources list returned
+- **Verify**: sources: [] in response
+
+**Test Case 4.2: Multiple Sources**
+- **Precondition**: Crawl content from 2-3 different domains
+- **Expected**: All sources listed with metadata
+- **Verify**: Each source has source_id, summary, word_count, timestamps
+
+**Test Case 4.3: Source Summary Quality**
+- **Precondition**: Crawl a well-known documentation site
+- **Expected**: AI-generated summaries are relevant and informative
+- **Verify**: Summary accurately describes the source content
+
+#### Test Suite 5: perform_rag_query Tool Testing
+**Objective**: Test semantic search and retrieval functionality
+
+**Test Case 5.1: Basic Semantic Search**
+- **Precondition**: Crawl Python documentation
+- **Input**: `query: "how to define a function", match_count: 5`
+- **Expected**: Relevant content chunks about Python functions
+- **Verify**: Results contain function definition examples and explanations
+
+**Test Case 5.2: Source-Filtered Search**
+- **Precondition**: Crawl content from multiple sources
+- **Input**: `query: "variables", source: "docs.python.org", match_count: 3`
+- **Expected**: Results only from specified source
+- **Verify**: All results have source_id matching filter
+
+**Test Case 5.3: Hybrid Search (USE_HYBRID_SEARCH=true)**
+- **Input**: `query: "def function", match_count: 5`
+- **Expected**: Results combine semantic and keyword matching
+- **Verify**: Response indicates hybrid search was used
+
+**Test Case 5.4: Reranking (USE_RERANKING=true)**
+- **Input**: `query: "error handling in Python", match_count: 10`
+- **Expected**: Results reordered by relevance using cross-encoder
+- **Verify**: Response includes rerank_score for each result
+
+**Test Case 5.5: Empty Query Handling**
+- **Input**: `query: "", match_count: 5`
+- **Expected**: Graceful handling of empty query
+- **Verify**: Appropriate error message or empty results
+
+#### Test Suite 6: search_code_examples Tool Testing (USE_AGENTIC_RAG=true)
+**Objective**: Test specialized code example search
+
+**Test Case 6.1: Code-Specific Search**
+- **Precondition**: Crawl documentation with USE_AGENTIC_RAG=true
+- **Input**: `query: "for loop example", match_count: 3`
+- **Expected**: Code examples with for loops and their summaries
+- **Verify**: Results contain actual code blocks and AI-generated summaries
+
+**Test Case 6.2: Source-Filtered Code Search**
+- **Input**: `query: "class definition", source_id: "docs.python.org", match_count: 5`
+- **Expected**: Code examples only from specified source
+- **Verify**: All results match source filter
+
+**Test Case 6.3: Tool Availability Check**
+- **Precondition**: USE_AGENTIC_RAG=false
+- **Expected**: search_code_examples tool not available
+- **Verify**: Tool does not appear in MCP Inspector tools list
+
+#### Test Suite 7: RAG Strategy Configuration Testing
+**Objective**: Verify different RAG strategies work correctly
+
+**Test Case 7.1: Contextual Embeddings (USE_CONTEXTUAL_EMBEDDINGS=true)**
+- **Setup**: Enable contextual embeddings, crawl content
+- **Input**: Perform RAG query on crawled content
+- **Expected**: Enhanced retrieval quality due to contextual information
+- **Verify**: Metadata indicates contextual_embedding: true
+
+**Test Case 7.2: Strategy Combination Testing**
+- **Setup**: Enable all RAG strategies (full configuration)
+- **Input**: Complex query requiring multiple strategies
+- **Expected**: All strategies work together without conflicts
+- **Verify**: Response indicates all enabled strategies were used
+
+#### Test Suite 8: Error Handling and Edge Cases
+**Objective**: Test system robustness and error recovery
+
+**Test Case 8.1: Database Connection Failure**
+- **Setup**: Temporarily stop PostgreSQL service
+- **Expected**: Graceful error handling, informative error messages
+- **Verify**: Server doesn't crash, proper error responses
+
+**Test Case 8.2: OpenAI API Failure**
+- **Setup**: Use invalid OPENAI_API_KEY
+- **Expected**: Embedding operations fail gracefully
+- **Verify**: Appropriate error messages, fallback behavior
+
+**Test Case 8.3: Large Content Handling**
+- **Input**: Crawl very large webpage (>100KB content)
+- **Expected**: Proper chunking, no memory issues
+- **Verify**: Content split into appropriate chunks, all stored successfully
+
+**Test Case 8.4: Concurrent Tool Calls**
+- **Setup**: Make multiple simultaneous tool calls
+- **Expected**: Proper handling of concurrent requests
+- **Verify**: No race conditions, all requests complete successfully
+
+### Testing Execution Workflow
+
+#### Phase 1: Environment Setup Verification
+1. **Database Connectivity**: Test PostgreSQL connection and schema
+2. **Environment Variables**: Verify all required variables are set
+3. **MCP Server Startup**: Confirm server starts without errors
+4. **MCP Inspector Connection**: Establish connection via SSE or stdio
+
+#### Phase 2: Basic Functionality Testing
+1. Execute Test Suites 1-2 (tool availability and basic crawling)
+2. Verify database operations work correctly
+3. Test error handling with invalid inputs
+
+#### Phase 3: Advanced Feature Testing
+1. Execute Test Suites 3-6 (advanced crawling and RAG functionality)
+2. Test different RAG strategy configurations
+3. Verify performance with larger datasets
+
+#### Phase 4: Integration and Stress Testing
+1. Execute Test Suites 7-8 (configuration and error handling)
+2. Test concurrent operations and edge cases
+3. Verify system stability under load
+
+### Success Criteria Summary
+
+**Critical Success Criteria (Must Pass)**:
+- All 5 tools properly exposed and functional
+- Basic crawling and storage operations work
+- RAG queries return relevant results
+- Database operations complete without errors
+- Error handling prevents system crashes
+
+**Quality Success Criteria (Should Pass)**:
+- RAG strategies enhance retrieval quality as expected
+- Performance meets acceptable thresholds
+- Code example extraction works when enabled
+- Source filtering operates correctly
+
+**Excellence Success Criteria (Nice to Have)**:
+- Advanced RAG strategies show measurable improvement
+- System handles edge cases gracefully
+- Concurrent operations perform well
+- Error messages are helpful and actionable
 </current_tasks>
 
 ## 📏 Code Quality & Structure Standards
