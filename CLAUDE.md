@@ -227,6 +227,7 @@ source crawl_venv/bin/activate && python src/crawl4ai_mcp.py
 - [x] Clean up project structure and finalize production-ready setup (2025-01-13) - TASK-016
 - [x] Fix PostgreSQL vector embedding format issue (2025-01-13) - TASK-017
 - [x] Fix function naming conflict causing NoneType callable error (2025-01-13) - TASK-018
+- [x] Update documentation with all fixes and improvements (2025-01-13) - TASK-019
 
 ### Backlog
 <!-- Future tasks and improvements -->
