@@ -12,6 +12,18 @@ from pydantic_ai.mcp import MCPServerHTTP
 from .dependencies import CrawlDependencies, RAGDependencies, WorkflowDependencies
 from .outputs import CrawlResult, RAGResult, WorkflowResult
 
+# Import logfire for Pydantic AI integration
+try:
+    import logfire
+    # Configure logfire for Pydantic AI agents
+    logfire.configure()
+    LOGFIRE_AVAILABLE = True
+except ImportError:
+    LOGFIRE_AVAILABLE = False
+
+# Import logging utilities
+from ..logging_config import log_agent_interaction, logger
+
 
 async def create_mcp_connection(server_url: str) -> MCPServerHTTP:
     """
@@ -42,12 +54,13 @@ def create_crawl_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
     server = MCPServerHTTP(url=server_url)
 
     # Create agent with MCP server - following documented pattern
-    agent = Agent(
-        'openai:gpt-4o',
-        deps_type=CrawlDependencies,
-        output_type=CrawlResult,
-        mcp_servers=[server],
-        system_prompt=(
+    # Enable logfire instrumentation if available
+    agent_kwargs = {
+        'model': 'openai:gpt-4o',
+        'deps_type': CrawlDependencies,
+        'output_type': CrawlResult,
+        'mcp_servers': [server],
+        'system_prompt': (
             "You are an intelligent web crawling assistant that helps users efficiently "
             "crawl and index web content. You have access to a crawl4ai MCP server that "
             "provides powerful crawling capabilities including single page crawling, "
@@ -58,8 +71,14 @@ def create_crawl_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
             "3. Execute the crawling operation using the available tools\n"
             "4. Provide structured results with clear summaries\n\n"
             "Always prioritize efficiency and provide helpful summaries of what was accomplished."
-        ),
-    )
+        )
+    }
+    
+    # Add logfire instrumentation if available
+    if LOGFIRE_AVAILABLE:
+        agent_kwargs['logfire'] = {'tags': ['crawl-agent', 'mcp-client']}
+    
+    agent = Agent(**agent_kwargs)
 
     # Register tools following documented @agent.tool pattern
     @agent.tool
@@ -102,12 +121,13 @@ def create_rag_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
     server = MCPServerHTTP(url=server_url)
 
     # Create agent with MCP server - following documented pattern
-    agent = Agent(
-        'openai:gpt-4o',
-        deps_type=RAGDependencies,
-        output_type=RAGResult,
-        mcp_servers=[server],
-        system_prompt=(
+    # Enable logfire instrumentation if available
+    agent_kwargs = {
+        'model': 'openai:gpt-4o',
+        'deps_type': RAGDependencies,
+        'output_type': RAGResult,
+        'mcp_servers': [server],
+        'system_prompt': (
             "You are an intelligent content retrieval assistant that helps users find "
             "and synthesize information from crawled web content. You have access to a "
             "sophisticated RAG system with vector search, hybrid search, and code example "
@@ -119,8 +139,14 @@ def create_rag_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
             "4. Synthesize a comprehensive answer from the retrieved content\n"
             "5. Provide confidence scores and source attribution\n\n"
             "Always strive to provide accurate, well-sourced answers with appropriate confidence levels."
-        ),
-    )
+        )
+    }
+    
+    # Add logfire instrumentation if available
+    if LOGFIRE_AVAILABLE:
+        agent_kwargs['logfire'] = {'tags': ['rag-agent', 'mcp-client']}
+    
+    agent = Agent(**agent_kwargs)
 
     # Register tools following documented @agent.tool pattern
     @agent.tool
@@ -163,12 +189,13 @@ def create_workflow_agent(server_url: str = "http://localhost:8051/sse") -> Agen
     server = MCPServerHTTP(url=server_url)
 
     # Create agent with MCP server - following documented pattern
-    agent = Agent(
-        'openai:gpt-4o',
-        deps_type=WorkflowDependencies,
-        output_type=WorkflowResult,
-        mcp_servers=[server],
-        system_prompt=(
+    # Enable logfire instrumentation if available
+    agent_kwargs = {
+        'model': 'openai:gpt-4o',
+        'deps_type': WorkflowDependencies,
+        'output_type': WorkflowResult,
+        'mcp_servers': [server],
+        'system_prompt': (
             "You are an intelligent workflow orchestrator that combines web crawling "
             "and content retrieval to accomplish complex research and analysis tasks. "
             "You can coordinate multiple operations to achieve sophisticated goals.\n\n"
@@ -179,12 +206,19 @@ def create_workflow_agent(server_url: str = "http://localhost:8051/sse") -> Agen
             "4. Synthesize results from multiple steps into coherent outputs\n"
             "5. Provide recommendations for follow-up actions\n\n"
             "Always think step-by-step and provide clear progress updates."
-        ),
-    )
+        )
+    }
+    
+    # Add logfire instrumentation if available
+    if LOGFIRE_AVAILABLE:
+        agent_kwargs['logfire'] = {'tags': ['workflow-agent', 'mcp-client']}
+    
+    agent = Agent(**agent_kwargs)
 
     return agent
 
 
+@log_agent_interaction("generic")
 async def run_agent_with_mcp(
     agent: Agent,
     prompt: str,
@@ -204,8 +238,11 @@ async def run_agent_with_mcp(
     Returns:
         The agent's structured output
     """
+    logger.info("Starting agent interaction", prompt_length=len(str(prompt)))
+    
     # Run agent with MCP server context (agent already has MCP servers configured)
     async with agent.run_mcp_servers():
         result = await agent.run(prompt, deps=dependencies)
 
+    logger.info("Agent interaction completed successfully", result_type=type(result).__name__)
     return result

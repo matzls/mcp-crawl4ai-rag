@@ -143,6 +143,7 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 - ✅ **Startup Performance**: 90% faster server initialization (TASK-015, TASK-016)
 - ✅ **Pydantic AI Integration**: Complete agent framework integration (TASK-020)
 - ✅ **Testing Results**: Production-ready performance verified (TASK-021)
+- ✅ **Logfire Integration**: Comprehensive logging for MCP server and Pydantic AI agents (TASK-023)
 
 ### External Dependencies
 
@@ -152,6 +153,30 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 
 #### Optional Enhancements
 - **Cross-encoder Models**: For reranking (runs locally, CPU-based)
+
+### Observability & Logging
+
+#### Logfire Integration - PRODUCTION READY
+- **Comprehensive Coverage**: All MCP tools and Pydantic AI agents instrumented
+- **Structured Logging**: JSON-formatted logs with rich metadata and context
+- **Performance Metrics**: Execution times, token counts, success/failure rates
+- **Error Tracking**: Detailed error traces with stack traces and context
+- **Configuration**: Environment-based setup via `LOGFIRE_TOKEN`
+- **Fallback**: Graceful degradation to console logging if logfire unavailable
+
+#### Logging Components
+- **MCP Server Tools**: All 5 tools instrumented with `@log_mcp_tool_execution`
+- **Agent Interactions**: Pydantic AI runs logged with `@log_agent_interaction`
+- **Database Operations**: PostgreSQL queries and vector operations tracked
+- **System Events**: Startup, configuration, and lifecycle events
+- **Custom Decorators**: Reusable logging patterns for consistency
+
+#### Logfire Dashboard Features
+- **Real-time Traces**: Live execution spans with nested operation details
+- **Performance Profiling**: Tool execution times and resource usage
+- **Error Analysis**: Structured error data with filtering and alerting
+- **Business Metrics**: Crawling success rates, search quality, user workflows
+- **Search & Filtering**: Query logs by agent type, tool, error, or custom tags
 </project_architecture>
 
 <current_tasks>
@@ -159,7 +184,6 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 
 ### Active Tasks
 <!-- Tasks currently being worked on -->
-- [x] Streamline CLAUDE.md file by removing redundant sections and condensing verbose content (2025-01-13) - TASK-022
 
 ### Completed Tasks
 <!-- Recently completed tasks with completion dates -->
@@ -177,14 +201,16 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 - [x] Update documentation with all fixes and improvements (2025-01-13) - TASK-019
 - [x] Add Pydantic AI agent integration with MCP server (2025-01-13) - TASK-020
 - [x] Complete end-to-end testing and verification of system (2025-01-13) - TASK-021
+- [x] Streamline CLAUDE.md file by removing redundant sections and condensing verbose content (2025-01-13) - TASK-022
+- [x] Implement comprehensive logfire logging for both MCP server and Pydantic AI agents (2025-01-13) - TASK-023
 
 ### Backlog
 <!-- Future tasks and improvements -->
-- [ ] Add support for multiple embedding models (Ollama integration) - TASK-023
-- [ ] Implement Context 7-inspired chunking strategy - TASK-024
-- [ ] Performance optimization for crawling speed - TASK-025
-- [ ] Integration with Archon knowledge engine - TASK-026
-- [ ] Enhanced configuration management for RAG strategies - TASK-027
+- [ ] Add support for multiple embedding models (Ollama integration) - TASK-024
+- [ ] Implement Context 7-inspired chunking strategy - TASK-025
+- [ ] Performance optimization for crawling speed - TASK-026
+- [ ] Integration with Archon knowledge engine - TASK-027
+- [ ] Enhanced configuration management for RAG strategies - TASK-028
 
 ### Task Guidelines
 - Each task should have a unique ID (TASK-001, TASK-002, etc.)
@@ -276,6 +302,12 @@ curl -X POST "http://localhost:8051/tools/get_available_sources"
 
 # Monitor database
 psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"
+
+# Test logfire logging setup
+python test_logging.py
+
+# Run comprehensive logging demonstration
+python src/pydantic_agent/examples/logging_example.py
 ```
 
 ## 🧠 AI Behavior Rules

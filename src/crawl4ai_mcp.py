@@ -35,6 +35,15 @@ from utils import (
     search_code_examples as search_code_examples_util
 )
 
+from logging_config import (
+    log_mcp_tool_execution,
+    log_database_operation,
+    log_crawling_operation,
+    log_rag_query,
+    log_system_startup,
+    logger
+)
+
 # Load environment variables from the project root .env file
 project_root = Path(__file__).resolve().parent.parent
 dotenv_path = project_root / '.env'
@@ -267,6 +276,7 @@ def process_code_example(args):
     return generate_code_example_summary(code, context_before, context_after)
 
 @mcp.tool()
+@log_mcp_tool_execution("crawl_single_page")
 async def crawl_single_page(ctx: Context, url: str) -> str:
     """
     Crawl a single web page and store its content in PostgreSQL.
@@ -407,6 +417,7 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
         }, indent=2)
 
 @mcp.tool()
+@log_mcp_tool_execution("smart_crawl_url")
 async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concurrent: int = 10, chunk_size: int = 5000) -> str:
     """
     Intelligently crawl a URL based on its type and store content in PostgreSQL.
@@ -604,6 +615,7 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
         }, indent=2)
 
 @mcp.tool()
+@log_mcp_tool_execution("get_available_sources")
 async def get_available_sources(ctx: Context) -> str:
     """
     Get all available sources from the sources table.
@@ -655,6 +667,7 @@ async def get_available_sources(ctx: Context) -> str:
         }, indent=2)
 
 @mcp.tool()
+@log_mcp_tool_execution("perform_rag_query")
 async def perform_rag_query(ctx: Context, query: str, source: str = None, match_count: int = 5) -> str:
     """
     Perform a RAG (Retrieval Augmented Generation) query on the stored content.
@@ -801,6 +814,7 @@ async def perform_rag_query(ctx: Context, query: str, source: str = None, match_
         }, indent=2)
 
 @mcp.tool()
+@log_mcp_tool_execution("search_code_examples")
 async def search_code_examples(ctx: Context, query: str, source_id: str = None, match_count: int = 5) -> str:
     """
     Search for code examples relevant to the query.
@@ -1055,7 +1069,12 @@ async def crawl_recursive_internal_links(crawler: AsyncWebCrawler, start_urls: L
     return results_all
 
 async def main():
+    # Log system startup
+    log_system_startup("crawl4ai-mcp-server", "0.1.0")
+    
     transport = os.getenv("TRANSPORT", "sse")
+    logger.info(f"Starting MCP server with {transport} transport")
+    
     if transport == 'sse':
         # Run the MCP server with sse transport
         await mcp.run_sse_async()
