@@ -12,7 +12,8 @@ Prerequisites:
 
 import asyncio
 import os
-from pydantic_ai.mcp import MCPServerHTTP
+from dotenv import load_dotenv
+from pydantic_ai.mcp import MCPServerSSE
 from pydantic_ai import Agent
 
 from ..dependencies import CrawlDependencies
@@ -37,7 +38,7 @@ async def basic_crawl_example():
     
     try:
         # Create MCP server connection following documented pattern
-        server = MCPServerHTTP(url=deps.mcp_server_url)
+        server = MCPServerSSE(url=deps.mcp_server_url)
         
         # Configure agent with MCP server
         agent = Agent(
@@ -106,7 +107,7 @@ async def interactive_crawl_example():
     print("Enter URLs to crawl (or 'quit' to exit)")
     
     deps = CrawlDependencies()
-    server = MCPServerHTTP(url=deps.mcp_server_url)
+    server = MCPServerSSE(url=deps.mcp_server_url)
     
     agent = Agent(
         'openai:gpt-4o',
@@ -151,9 +152,12 @@ async def interactive_crawl_example():
 
 
 if __name__ == "__main__":
+    # Load environment variables
+    load_dotenv()
+
     # Check if MCP server is likely running
     print("🔍 Checking prerequisites...")
-    
+
     # Basic environment check
     if not os.getenv("OPENAI_API_KEY"):
         print("⚠️  Warning: OPENAI_API_KEY not found in environment")
