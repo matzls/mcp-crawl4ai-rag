@@ -279,17 +279,22 @@ def process_code_example(args):
 @log_mcp_tool_execution("crawl_single_page")
 async def crawl_single_page(ctx: Context, url: str) -> str:
     """
-    Crawl a single web page and store its content in PostgreSQL.
+    Crawl a single web page and store its content in PostgreSQL for later retrieval.
     
-    This tool is ideal for quickly retrieving content from a specific URL without following links.
-    The content is stored in PostgreSQL for later retrieval and querying.
+    USE WHEN: User wants content from ONE specific webpage without following links.
+    DON'T USE: For sitemaps, multiple pages, or recursive crawling (use smart_crawl_url instead).
+    
+    WORKFLOW: This tool STORES content. Follow with perform_rag_query to search stored content.
+    TYPICAL PATTERN: crawl_single_page → get_available_sources → perform_rag_query
     
     Args:
         ctx: The MCP server provided context
-        url: URL of the web page to crawl
+        url: Target webpage URL (e.g., "https://docs.python.org/3/tutorial/introduction.html")
     
     Returns:
-        Summary of the crawling operation and storage in PostgreSQL
+        JSON with success status, chunks_stored count, content_length, source_id, and processing summary
+        
+    ERRORS: Network failures, invalid URLs, content extraction failures, database storage issues
     """
     try:
         # Get the crawler from the context
@@ -420,24 +425,33 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
 @log_mcp_tool_execution("smart_crawl_url")
 async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concurrent: int = 10, chunk_size: int = 5000) -> str:
     """
-    Intelligently crawl a URL based on its type and store content in PostgreSQL.
+    Intelligently crawl web content with automatic URL type detection and store in PostgreSQL.
     
-    This tool automatically detects the URL type and applies the appropriate crawling method:
-    - For sitemaps: Extracts and crawls all URLs in parallel
-    - For text files (llms.txt): Directly retrieves the content
-    - For regular webpages: Recursively crawls internal links up to the specified depth
+    USE WHEN: User wants to gather NEW content from websites, sitemaps, or documentation sites.
+    DON'T USE: If user is asking questions about EXISTING content (use perform_rag_query instead).
     
-    All crawled content is chunked and stored in PostgreSQL for later retrieval and querying.
+    AUTOMATIC DETECTION & STRATEGY:
+    - Sitemap URLs (*.xml, */sitemap*): Extracts all URLs and crawls in parallel
+    - Text files (*.txt, *.md): Direct content retrieval without browser rendering
+    - Regular webpages: Recursive crawling following internal links up to max_depth
+    
+    WORKFLOW: This tool STORES content. Follow with get_available_sources → perform_rag_query to search it.
+    TYPICAL PATTERN: smart_crawl_url → get_available_sources → perform_rag_query/search_code_examples
     
     Args:
         ctx: The MCP server provided context
-        url: URL to crawl (can be a regular webpage, sitemap.xml, or .txt file)
-        max_depth: Maximum recursion depth for regular URLs (default: 3)
-        max_concurrent: Maximum number of concurrent browser sessions (default: 10)
-        chunk_size: Maximum size of each content chunk in characters (default: 5000)
+        url: Target URL - examples:
+             • "https://docs.python.org" (recursive webpage crawling)
+             • "https://site.com/sitemap.xml" (sitemap extraction) 
+             • "https://raw.github.com/user/repo/README.md" (direct text file)
+        max_depth: Link recursion depth for webpages (1-5, default: 3, higher=more pages)
+        max_concurrent: Parallel browser sessions (1-20, default: 10, higher=faster but more memory)
+        chunk_size: Content chunk size in characters (1000-10000, default: 5000)
     
     Returns:
-        JSON string with crawl summary and storage information
+        JSON with crawl_type, pages_crawled, chunks_stored, code_examples_stored, urls_crawled[]
+        
+    ERRORS: Network timeouts, invalid URLs, rate limiting, browser failures, storage errors
     """
     try:
         # Get the crawler from the context
@@ -618,20 +632,25 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
 @log_mcp_tool_execution("get_available_sources")
 async def get_available_sources(ctx: Context) -> str:
     """
-    Get all available sources from the sources table.
+    List all crawled content sources available for searching and querying.
     
-    This tool returns a list of all unique sources (domains) that have been crawled and stored
-    in the database, along with their summaries and statistics. This is useful for discovering 
-    what content is available for querying.
-
-    Always use this tool before calling the RAG query or code example query tool
-    with a specific source filter!
+    USE WHEN: Before performing searches to see what content is indexed, or when user asks "what do you know about?"
+    DON'T USE: For actually searching content (use perform_rag_query or search_code_examples instead).
+    
+    WORKFLOW: This is typically the FIRST step in search workflows to understand available content.
+    TYPICAL PATTERNS: 
+    • get_available_sources → perform_rag_query (with source filter)
+    • get_available_sources → search_code_examples (with source_id filter)
+    
+    ALWAYS USE: Before calling perform_rag_query or search_code_examples with source filtering!
     
     Args:
-        ctx: The MCP server provided context
+        ctx: The MCP server provided context (no parameters needed)
     
     Returns:
-        JSON string with the list of available sources and their details
+        JSON with sources[] array containing source_id, summary, total_words, created_at, updated_at
+        
+    ERRORS: Database connection failures, empty database (returns empty sources array)
     """
     try:
         # Get the PostgreSQL pool from the context
@@ -670,20 +689,30 @@ async def get_available_sources(ctx: Context) -> str:
 @log_mcp_tool_execution("perform_rag_query")
 async def perform_rag_query(ctx: Context, query: str, source: str = None, match_count: int = 5) -> str:
     """
-    Perform a RAG (Retrieval Augmented Generation) query on the stored content.
+    Search stored content using semantic similarity to answer questions and find relevant information.
     
-    This tool searches the vector database for content relevant to the query and returns
-    the matching documents. Optionally filter by source domain.
-    Get the source by using the get_available_sources tool before calling this search!
+    USE WHEN: User asks questions about topics, wants to find information, or needs content summaries.
+    DON'T USE: For gathering new content from web (use smart_crawl_url), or specifically for code (use search_code_examples).
+    
+    SEARCH CAPABILITIES:
+    • Vector similarity search using OpenAI embeddings
+    • Optional hybrid search (vector + keyword matching) if enabled
+    • Source filtering to search within specific domains
+    • Reranking for improved relevance if enabled
+    
+    WORKFLOW: Use get_available_sources first to see what content is available, then search it.
+    TYPICAL PATTERN: get_available_sources → perform_rag_query → (optional follow-up searches)
     
     Args:
         ctx: The MCP server provided context
-        query: The search query
-        source: Optional source domain to filter results (e.g., 'example.com')
-        match_count: Maximum number of results to return (default: 5)
+        query: Natural language search query (e.g., "Python async programming", "how to handle errors")
+        source: Optional source filter from get_available_sources (e.g., "docs.python.org", "github.com")
+        match_count: Number of results to return (1-20, default: 5, higher=more comprehensive)
     
     Returns:
-        JSON string with the search results
+        JSON with query, search_mode, results[] containing url, content, metadata, similarity scores
+        
+    ERRORS: Empty database, no matches found, embedding generation failures, database errors
     """
     try:
         # Get the PostgreSQL pool from the context
@@ -817,22 +846,31 @@ async def perform_rag_query(ctx: Context, query: str, source: str = None, match_
 @log_mcp_tool_execution("search_code_examples")
 async def search_code_examples(ctx: Context, query: str, source_id: str = None, match_count: int = 5) -> str:
     """
-    Search for code examples relevant to the query.
+    Search specifically for code examples and programming snippets with AI-generated summaries.
     
-    This tool searches the vector database for code examples relevant to the query and returns
-    the matching examples with their summaries. Optionally filter by source_id.
-    Get the source_id by using the get_available_sources tool before calling this search!
-
-    Use the get_available_sources tool first to see what sources are available for filtering.
+    USE WHEN: User specifically asks for code examples, programming snippets, or implementation details.
+    DON'T USE: For general information searches (use perform_rag_query), or if USE_AGENTIC_RAG=false.
+    
+    SPECIALIZED SEARCH:
+    • Targets extracted code blocks from crawled content
+    • Includes AI-generated summaries explaining what each code does
+    • Searches both code content and summaries for better matching
+    • Optional hybrid search combining vector and keyword matching
+    
+    AVAILABILITY: Only works if USE_AGENTIC_RAG=true in environment configuration.
+    WORKFLOW: Use get_available_sources first, then search for code within specific sources.
+    TYPICAL PATTERN: get_available_sources → search_code_examples (with source_id filter)
     
     Args:
         ctx: The MCP server provided context
-        query: The search query
-        source_id: Optional source ID to filter results (e.g., 'example.com')
-        match_count: Maximum number of results to return (default: 5)
+        query: Code-focused search query (e.g., "async function example", "error handling try catch", "class definition")
+        source_id: Optional source filter from get_available_sources (e.g., "docs.python.org", "github.com")
+        match_count: Number of code examples to return (1-15, default: 5)
     
     Returns:
-        JSON string with the search results
+        JSON with query, results[] containing url, code, summary, metadata, similarity scores
+        
+    ERRORS: Feature disabled (USE_AGENTIC_RAG=false), no code examples found, database errors
     """
     # Check if code example extraction is enabled
     extract_code_examples_enabled = os.getenv("USE_AGENTIC_RAG", "false") == "true"

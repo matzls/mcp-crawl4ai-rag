@@ -42,7 +42,7 @@ async def basic_crawl_example():
         
         # Configure agent with MCP server
         agent = Agent(
-            'openai:gpt-4o',
+            'openai:o3',
             deps_type=CrawlDependencies,
             output_type=CrawlResult,
             mcp_servers=[server],
@@ -110,7 +110,7 @@ async def interactive_crawl_example():
     server = MCPServerSSE(url=deps.mcp_server_url)
     
     agent = Agent(
-        'openai:gpt-4o',
+        'openai:o3',
         deps_type=CrawlDependencies,
         output_type=CrawlResult,
         mcp_servers=[server],

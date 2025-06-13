@@ -127,15 +127,13 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 - **SSE Endpoint**: Responding with proper event streams
 - **Virtual Environment**: `crawl_venv` with all dependencies installed
 
-#### Pydantic AI Agent Status - PRODUCTION READY
-- **Agent Factory Functions**: Fully implemented and tested
-  - `create_crawl_agent()` - Web crawling operations
-  - `create_rag_agent()` - Content retrieval and semantic search
-  - `create_workflow_agent()` - Multi-step workflow orchestration
-- **Dependencies System**: Type-safe configuration with CrawlDependencies, RAGDependencies, WorkflowDependencies
-- **Structured Outputs**: Complete Pydantic models (CrawlResult, RAGResult, WorkflowResult)
-- **MCP Integration**: Proper MCPServerSSE client pattern with agent.run_mcp_servers() context manager
-- **Code Quality**: Import errors fixed, example files corrected
+#### Pydantic AI Agent Status - ARCHITECTURE REFACTORING IN PROGRESS
+- **Previous Architecture (Deprecated)**: Three separate agents (crawl, rag, workflow) - Being replaced
+- **New Architecture (In Development)**: Single intelligent orchestrator agent
+- **Agent Design Philosophy**: One agent that intelligently selects from 5 MCP tools based on user intent
+- **MCP Tool Integration**: Direct access to all 5 tools with intelligent selection logic
+- **Structured Outputs**: Unified response models with comprehensive result synthesis
+- **Enhanced Tool Descriptions**: Improved with USE WHEN/DON'T USE guidance and workflow patterns
 
 #### Recent Key Fixes (All Resolved)
 - ✅ **Vector Embedding Format**: PostgreSQL vector compatibility fixed (TASK-017)
@@ -144,6 +142,42 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 - ✅ **Pydantic AI Integration**: Complete agent framework integration (TASK-020)
 - ✅ **Testing Results**: Production-ready performance verified (TASK-021)
 - ✅ **Logfire Integration**: Comprehensive logging for MCP server and Pydantic AI agents (TASK-023)
+- 🔄 **Architecture Refactoring**: Single orchestrator agent replacing 3-agent approach (TASK-024 - IN PROGRESS)
+
+### New Architecture: Single Intelligent Orchestrator
+
+#### Design Philosophy (Following MCP Best Practices)
+- **One Agent, Five Tools**: Single agent intelligently selects from 5 MCP tools based on user intent
+- **Intent-Driven Tool Selection**: Agent analyzes user queries to determine optimal workflow patterns
+- **Workflow Orchestration**: Automated multi-step processes with context management
+- **Enhanced User Experience**: No agent selection needed - natural language interaction
+
+#### Tool Selection Logic
+**Research Workflow** (URLs mentioned):
+1. `smart_crawl_url` → Gather new content
+2. `get_available_sources` → Confirm storage  
+3. `perform_rag_query` → Answer questions about crawled content
+
+**Search Workflow** (questions about topics):
+1. `get_available_sources` → Check available content
+2. `perform_rag_query` → Find relevant information
+3. `search_code_examples` → If code specifically requested
+
+**Discovery Workflow** (content exploration):
+1. `get_available_sources` → List what's available
+2. Optional follow-up searches based on user interest
+
+#### Enhanced Tool Descriptions
+- **USE WHEN/DON'T USE** guidance for clear tool boundaries
+- **Workflow patterns** showing tool dependencies and sequences  
+- **Concrete examples** with parameter demonstrations
+- **Error scenarios** for robust error handling
+
+#### Implementation Components
+- `src/pydantic_agent/unified_agent.py` - Single orchestrator agent
+- `cli_chat.py` - Interactive CLI interface with rich formatting
+- `src/pydantic_agent/examples/unified_agent_example.py` - Comprehensive demonstrations
+- Enhanced MCP tool descriptions in `src/crawl4ai_mcp.py`
 
 ### External Dependencies
 
@@ -184,6 +218,7 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 
 ### Active Tasks
 <!-- Tasks currently being worked on -->
+- [⚠️] Complete unified agent architecture implementation and testing (2025-01-13) - TASK-024
 
 ### Completed Tasks
 <!-- Recently completed tasks with completion dates -->
@@ -258,9 +293,12 @@ from ..core import config
 - **Coverage targets**: >80% production, >60% prototype
 
 ### Key Test Scenarios
+- **Unified Agent**: Single intelligent orchestrator with tool selection logic
 - **MCP Tools**: All 5 tools (crawl_single_page, smart_crawl_url, get_available_sources, perform_rag_query, search_code_examples)
+- **Workflow Patterns**: Research (crawl→search), Search-only, Code-focused, Discovery workflows  
+- **Tool Orchestration**: Intent analysis, automatic tool selection, multi-step coordination
 - **Database Operations**: Vector storage and retrieval
-- **Error Handling**: Invalid inputs, API failures, connection issues
+- **Error Handling**: Invalid inputs, API failures, connection issues, graceful fallbacks
 - **RAG Strategies**: Contextual embeddings, hybrid search, reranking
 
 ## 🛠️ Essential Development Commands
@@ -308,6 +346,12 @@ python test_logging.py
 
 # Run comprehensive logging demonstration
 python src/pydantic_agent/examples/logging_example.py
+
+# Test unified agent architecture
+python src/pydantic_agent/examples/unified_agent_example.py
+
+# Interactive CLI chat interface
+python cli_chat.py
 ```
 
 ## 🧠 AI Behavior Rules
