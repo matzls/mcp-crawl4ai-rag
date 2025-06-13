@@ -166,6 +166,18 @@ docker run --env-file .env -p 8051:8051 mcp/crawl4ai-rag
 - **SSE Transport**: HTTP server on configurable port (default 8051)
 - **Stdio Transport**: Direct process communication for desktop clients
 - **Configuration**: Environment-based with .env file support
+
+#### Fork Maintenance Strategy
+- **Automated Upstream Sync**: GitHub Actions workflow (`.github/workflows/sync-upstream.yml`) syncs upstream changes daily at 2 AM UTC
+- **Upstream Repository**: `https://github.com/coleam00/mcp-crawl4ai-rag.git`
+- **Branch Management**: Automatically merges upstream changes into main and feature/custom-database branches
+- **Conflict Resolution**: Creates GitHub issue with label `sync-conflict` when merge conflicts occur
+- **Manual Trigger**: Workflow can be triggered manually via GitHub Actions `workflow_dispatch`
+- **Workflow Features**:
+  - Compares SHA hashes to detect upstream changes
+  - Uses `github-actions[bot]` for automated commits
+  - Graceful handling of missing feature branches
+  - Full fetch depth for complete history access
 </project_architecture>
 
 <current_tasks>
@@ -545,6 +557,29 @@ psql -h localhost -U postgres -d crawl4ai_rag -c "SELECT source_id, total_word_c
 
 # Check environment variables
 env | grep -E "(OPENAI|DATABASE|POSTGRES|USE_)"
+```
+
+### Fork Maintenance Commands
+```bash
+# Manual upstream sync (alternative to GitHub Actions)
+git remote add upstream https://github.com/coleam00/mcp-crawl4ai-rag.git
+git fetch upstream
+git checkout main
+git merge upstream/main --no-edit
+git push origin main
+
+# Sync feature branch manually
+git checkout feature/custom-database
+git merge main
+# Resolve any conflicts manually
+git commit
+git push origin feature/custom-database
+
+# Trigger automated workflow manually
+gh workflow run sync-upstream.yml
+
+# Check workflow status
+gh run list --workflow=sync-upstream.yml
 ```
 
 ---
