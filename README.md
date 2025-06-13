@@ -115,29 +115,13 @@ The typical workflow combines multiple tools:
 
 ## Prerequisites
 
-- [Docker/Docker Desktop](https://www.docker.com/products/docker-desktop/) if running the MCP server as a container (recommended)
-- [Python 3.12+](https://www.python.org/downloads/) if running the MCP server directly through uv
-- [PostgreSQL 16+](https://www.postgresql.org/download/) with [pgvector extension](https://github.com/pgvector/pgvector) (local database for RAG)
+- [Python 3.12+](https://www.python.org/downloads/) with [uv package manager](https://docs.astral.sh/uv/)
+- [PostgreSQL 17](https://www.postgresql.org/download/) with [pgvector extension](https://github.com/pgvector/pgvector) (local database for RAG)
 - [OpenAI API key](https://platform.openai.com/api-keys) (for generating embeddings)
 
 ## Installation
 
-### Using Docker (Recommended)
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/coleam00/mcp-crawl4ai-rag.git
-   cd mcp-crawl4ai-rag
-   ```
-
-2. Build the Docker image:
-   ```bash
-   docker build -t mcp/crawl4ai-rag --build-arg PORT=8051 .
-   ```
-
-3. Create a `.env` file based on the configuration section below
-
-### Using uv directly (no Docker)
+### Using uv (Recommended)
 
 1. Clone this repository:
    ```bash
@@ -167,41 +151,47 @@ The typical workflow combines multiple tools:
 
 ## Database Setup
 
-Before running the server, you need to set up PostgreSQL with the pgvector extension:
+Before running the server, you need to set up PostgreSQL 17 with the pgvector extension:
 
-### Option 1: Local PostgreSQL Installation
+### PostgreSQL 17 Setup
 
-1. **Install PostgreSQL and pgvector:**
+1. **Install PostgreSQL 17 and pgvector:**
    ```bash
    # macOS
-   brew install postgresql@16 pgvector
-   
+   brew install postgresql@17 pgvector
+
    # Ubuntu/Debian
-   sudo apt-get install postgresql-16 postgresql-16-pgvector
-   
-   # Or using Docker
-   docker run --name crawl4ai-postgres \
-     -e POSTGRES_PASSWORD=mypassword \
-     -e POSTGRES_DB=crawl4ai_rag \
-     -p 5432:5432 \
-     -d pgvector/pgvector:pg16
+   sudo apt-get install postgresql-17 postgresql-17-pgvector
    ```
 
-2. **Create the database and run schema:**
+2. **Start PostgreSQL and configure PATH:**
    ```bash
-   # Connect to PostgreSQL
-   psql -h localhost -U postgres
-   
-   # Create database (if not using Docker)
-   CREATE DATABASE crawl4ai_rag;
-   
-   # Connect to the database and run schema
-   psql -h localhost -U postgres -d crawl4ai_rag -f crawled_pages.sql
+   # macOS - Start service
+   brew services start postgresql@17
+
+   # Add to PATH (add to your shell profile: ~/.zshrc or ~/.bashrc)
+   export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
    ```
 
-### Option 2: Using Existing PostgreSQL
+3. **Create the database and run schema:**
+   ```bash
+   # Create database
+   createdb crawl4ai_rag
 
-If you have an existing PostgreSQL instance, ensure the pgvector extension is installed and run the `crawled_pages.sql` schema file to create the necessary tables and functions.
+   # Run schema to create tables and functions
+   psql -h localhost -U $(whoami) -d crawl4ai_rag -f crawled_pages.sql
+   ```
+
+### Verify Installation
+
+Test your PostgreSQL setup:
+```bash
+# Test connection
+psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT 1;"
+
+# Test pgvector extension
+psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT vector_dims('[1,2,3]'::vector);"
+```
 
 ## Configuration
 
@@ -226,14 +216,14 @@ USE_AGENTIC_RAG=false
 USE_RERANKING=false
 
 # PostgreSQL Configuration (Option 1: Use DATABASE_URL)
-DATABASE_URL=postgresql://username:password@localhost:5432/crawl4ai_rag
+DATABASE_URL=postgresql://mg:@localhost:5432/crawl4ai_rag
 
 # PostgreSQL Configuration (Option 2: Individual components)
 # POSTGRES_HOST=localhost
 # POSTGRES_PORT=5432
 # POSTGRES_DB=crawl4ai_rag
-# POSTGRES_USER=postgres
-# POSTGRES_PASSWORD=your_postgres_password
+# POSTGRES_USER=mg
+# POSTGRES_PASSWORD=
 ```
 
 ### RAG Strategy Options
@@ -298,13 +288,7 @@ USE_RERANKING=false
 
 ## Running the Server
 
-### Using Docker
-
-```bash
-docker run --env-file .env -p 8051:8051 mcp/crawl4ai-rag
-```
-
-### Using Python
+### Using Python with uv
 
 ```bash
 uv run src/crawl4ai_mcp.py
@@ -341,7 +325,7 @@ Once you have the server running with SSE transport, you can connect to it using
 > }
 > ```
 >
-> **Note for Docker users**: Use `host.docker.internal` instead of `localhost` if your client is running in a different container. This will apply if you are using this MCP server within n8n!
+> **Note**: Make sure PostgreSQL 17 is running and accessible at `localhost:5432` before starting the server.
 
 ### Stdio Configuration
 
@@ -356,29 +340,26 @@ Add this server to your MCP configuration for Claude Desktop, Windsurf, or any o
       "env": {
         "TRANSPORT": "stdio",
         "OPENAI_API_KEY": "your_openai_api_key",
-        "DATABASE_URL": "postgresql://username:password@localhost:5432/crawl4ai_rag"
+        "DATABASE_URL": "postgresql://mg:@localhost:5432/crawl4ai_rag"
       }
     }
   }
 }
 ```
 
-### Docker with Stdio Configuration
+### Alternative: Direct Python Execution
 
 ```json
 {
   "mcpServers": {
     "crawl4ai-rag": {
-      "command": "docker",
-      "args": ["run", "--rm", "-i", 
-               "-e", "TRANSPORT", 
-               "-e", "OPENAI_API_KEY", 
-               "-e", "DATABASE_URL",
-               "mcp/crawl4ai"],
+      "command": "uv",
+      "args": ["run", "src/crawl4ai_mcp.py"],
+      "cwd": "/path/to/mcp-crawl4ai-rag",
       "env": {
         "TRANSPORT": "stdio",
         "OPENAI_API_KEY": "your_openai_api_key",
-        "DATABASE_URL": "postgresql://username:password@host.docker.internal:5432/crawl4ai_rag"
+        "DATABASE_URL": "postgresql://mg:@localhost:5432/crawl4ai_rag"
       }
     }
   }

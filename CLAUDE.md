@@ -145,7 +145,6 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 
 #### Optional Enhancements
 - **Cross-encoder Models**: For reranking (runs locally, CPU-based)
-- **Docker**: For containerized deployment
 
 ### Deployment Strategy
 
@@ -156,10 +155,13 @@ uv pip install -e .
 crawl4ai-setup
 ```
 
-#### Docker Deployment
+#### Production Deployment
 ```bash
-docker build -t mcp/crawl4ai-rag --build-arg PORT=8051 .
-docker run --env-file .env -p 8051:8051 mcp/crawl4ai-rag
+# Set environment variables and run
+export OPENAI_API_KEY=your_key
+export DATABASE_URL=postgresql://mg:@localhost:5432/crawl4ai_rag
+export TRANSPORT=sse
+uv run src/crawl4ai_mcp.py
 ```
 
 #### MCP Client Integration
@@ -774,18 +776,18 @@ crawl4ai-setup
 
 ### Database Setup
 ```bash
-# Install PostgreSQL with pgvector (macOS)
-brew install postgresql@16 pgvector
+# Install PostgreSQL 17 with pgvector (macOS)
+brew install postgresql@17 pgvector
+
+# Start PostgreSQL service
+brew services start postgresql@17
+
+# Add PostgreSQL 17 to PATH (add to your shell profile)
+export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 
 # Create database and run schema
-psql -h localhost -U postgres -d crawl4ai_rag -f crawled_pages.sql
-
-# OR using Docker for PostgreSQL
-docker run --name crawl4ai-postgres \
-  -e POSTGRES_PASSWORD=mypassword \
-  -e POSTGRES_DB=crawl4ai_rag \
-  -p 5432:5432 \
-  -d pgvector/pgvector:pg16
+createdb crawl4ai_rag
+psql -h localhost -U $(whoami) -d crawl4ai_rag -f crawled_pages.sql
 ```
 
 ### Running the MCP Server
@@ -796,9 +798,8 @@ uv run src/crawl4ai_mcp.py
 # Run server with SSE transport (HTTP)
 TRANSPORT=sse uv run src/crawl4ai_mcp.py
 
-# Run with Docker
-docker build -t mcp/crawl4ai-rag --build-arg PORT=8051 .
-docker run --env-file .env -p 8051:8051 mcp/crawl4ai-rag
+# Run with custom environment
+TRANSPORT=sse OPENAI_API_KEY=your_key DATABASE_URL=postgresql://mg:@localhost:5432/crawl4ai_rag uv run src/crawl4ai_mcp.py
 ```
 
 ### Configuration Management
@@ -817,7 +818,7 @@ python -c "from src.utils import create_postgres_pool; import asyncio; asyncio.r
 ### Development & Testing
 ```bash
 # Test database connection
-python -c "from src.utils import get_postgres_connection; import asyncio; asyncio.run(get_postgres_connection())"
+python -c "import asyncpg; import asyncio; asyncio.run(asyncpg.connect('postgresql://mg:@localhost:5432/crawl4ai_rag').close())"
 
 # Test single page crawl (manual testing)
 curl -X POST "http://localhost:8051/tools/crawl_single_page" \
@@ -839,8 +840,8 @@ curl -X POST "http://localhost:8051/tools/perform_rag_query" \
 python -c "from crawl4ai import AsyncWebCrawler; import asyncio; asyncio.run(AsyncWebCrawler().__aenter__())"
 
 # Monitor database tables
-psql -h localhost -U postgres -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"
-psql -h localhost -U postgres -d crawl4ai_rag -c "SELECT source_id, total_word_count FROM sources;"
+psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"
+psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT source_id, total_word_count FROM sources;"
 
 # Check environment variables
 env | grep -E "(OPENAI|DATABASE|POSTGRES|USE_)"
