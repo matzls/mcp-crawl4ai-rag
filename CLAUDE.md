@@ -69,7 +69,8 @@ When starting a new project with this CLAUDE.md:
 - **Web Crawling:** Crawl4AI with AsyncWebCrawler
 - **Database:** PostgreSQL with pgvector extension for vector storage
 - **AI/ML:** OpenAI API for embeddings and LLM processing
-- **Key Dependencies:** crawl4ai, mcp, asyncpg, openai, sentence-transformers
+- **Agent Framework:** Pydantic AI for intelligent agent development with MCP integration
+- **Key Dependencies:** crawl4ai, mcp, asyncpg, openai, sentence-transformers, pydantic-ai[logfire]
 
 <project_architecture>
 ## Project Architecture
@@ -153,6 +154,14 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 - **Virtual Environment Reuse**: Eliminated virtual environment creation overhead (90% faster startup)
 - **Browser Initialization**: Fixed Crawl4AI browser setup issues for reliable startup
 - **Clean Project Structure**: Removed testing artifacts and streamlined production setup
+
+#### Pydantic AI Integration (TASK-020)
+- **Agent Framework Integration**: Added Pydantic AI as intelligent agent layer connecting to MCP server as client
+- **Factory Pattern Implementation**: Created agent factory functions (create_crawl_agent, create_rag_agent, create_workflow_agent)
+- **Tool Registration**: Implemented @agent.tool decorators with RunContext for type-safe dependency injection
+- **MCP Client Pattern**: Uses MCPServerHTTP with agent.run_mcp_servers() async context manager
+- **Structured Outputs**: Pydantic models for validated responses (CrawlResult, RAGResult, WorkflowResult)
+- **Dependency Injection**: Type-safe configuration management with CrawlDependencies, RAGDependencies, WorkflowDependencies
 
 ### External Dependencies
 
