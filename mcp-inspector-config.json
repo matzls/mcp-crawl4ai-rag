@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "crawl4ai-rag-stdio": {
+      "command": "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/bin/python",
+      "args": ["src/crawl4ai_mcp.py"],
+      "cwd": "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag",
+      "env": {
+        "TRANSPORT": "stdio"
+      }
+    },
+    "crawl4ai-rag-sse": {
+      "url": "http://localhost:8051/sse",
+      "description": "Connect to running SSE server"
+    }
+  }
+}
