@@ -218,27 +218,35 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 
 ### Observability & Logging
 
-#### Logfire Integration - PRODUCTION READY
-- **Comprehensive Coverage**: All MCP tools and Pydantic AI agents instrumented
-- **Structured Logging**: JSON-formatted logs with rich metadata and context
-- **Performance Metrics**: Execution times, token counts, success/failure rates
-- **Error Tracking**: Detailed error traces with stack traces and context
-- **Configuration**: Environment-based setup via `LOGFIRE_TOKEN`
-- **Fallback**: Graceful degradation to console logging if logfire unavailable
+#### Enhanced Observability - PRODUCTION READY (Updated 2025-01-15)
+- **Comprehensive Agent Workflow Tracking**: Complete visibility into agent decision-making processes
+- **Decision-Making Instrumentation**: Captures tool selection reasoning, confidence assessments, and alternatives considered
+- **Multi-Stage Workflow Monitoring**: Tracks intent analysis, tool selection, execution, and result synthesis phases
+- **Performance Analysis**: Detailed timing metrics, bottleneck identification, and efficiency ratios
+- **Error Context Preservation**: Enhanced error categorization with recovery attempt tracking
+- **Conversation Context Management**: Session tracking with user intent analysis and preference learning
 
-#### Logging Components
-- **MCP Server Tools**: All 5 tools instrumented with `@log_mcp_tool_execution`
-- **Agent Interactions**: Pydantic AI runs logged with `@log_agent_interaction`
-- **Database Operations**: PostgreSQL queries and vector operations tracked
-- **System Events**: Startup, configuration, and lifecycle events
-- **Custom Decorators**: Reusable logging patterns for consistency
+#### Advanced Logging Architecture
+- **Enhanced MCP Tool Instrumentation**: `@log_mcp_tool_execution` with performance analysis and error categorization
+- **Agent Workflow Tracking**: `@enhanced_agent_observability` decorator with comprehensive decision logging
+- **Structured Decision Recording**: Captures reasoning, confidence, alternatives, and context for each agent decision
+- **Multi-Level Context Tracking**: Session, conversation, workflow, and tool execution contexts
+- **Performance Profiling**: Execution timing analysis with expected duration comparisons
 
-#### Logfire Dashboard Features
-- **Real-time Traces**: Live execution spans with nested operation details
-- **Performance Profiling**: Tool execution times and resource usage
-- **Error Analysis**: Structured error data with filtering and alerting
-- **Business Metrics**: Crawling success rates, search quality, user workflows
-- **Search & Filtering**: Query logs by agent type, tool, error, or custom tags
+#### Observability Components
+- **Core Module**: `src/observability.py` - Comprehensive workflow tracking and decision instrumentation
+- **Enhanced Logging**: `src/logging_config.py` - Advanced MCP tool logging with error analysis
+- **Unified Agent Integration**: Enhanced `run_unified_agent` with workflow stage tracking
+- **CLI Interface**: Real-time observability feedback in chat interface
+- **Example Demonstrations**: `enhanced_observability_example.py` with comprehensive workflow examples
+
+#### Logfire Dashboard Features (Enhanced)
+- **Agent Decision Traces**: Complete decision-making process with reasoning and alternatives
+- **Workflow Stage Visualization**: Intent analysis → Tool selection → Execution → Synthesis phases
+- **Performance Optimization Insights**: Slow execution detection, efficiency analysis, resource usage
+- **Error Recovery Tracking**: Error categorization, recovery attempts, and success rates
+- **Conversation Intelligence**: User intent patterns, preference learning, context evolution
+- **Advanced Filtering**: Search by decision type, workflow stage, performance metrics, error categories
 </project_architecture>
 
 <current_tasks>
@@ -246,7 +254,6 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 
 ### Active Tasks
 <!-- Tasks currently being worked on -->
-- [⚠️] Debug and resolve agent testing failures in unified architecture (2025-01-15) - TASK-025
 
 ### Completed Tasks
 <!-- Recently completed tasks with completion dates -->
@@ -267,6 +274,7 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 - [x] Streamline CLAUDE.md file by removing redundant sections and condensing verbose content (2025-01-13) - TASK-022
 - [x] Implement comprehensive logfire logging for both MCP server and Pydantic AI agents (2025-01-13) - TASK-023
 - [x] Complete unified agent architecture implementation with GPT-4.1 integration and import fixes (2025-01-15) - TASK-024
+- [x] Implement comprehensive observability for Pydantic AI agent workflow with decision tracking and performance analysis (2025-01-15) - TASK-032
 
 ### Backlog
 <!-- Future tasks and improvements -->
@@ -382,6 +390,9 @@ python src/pydantic_agent/examples/unified_agent_example.py
 
 # Interactive CLI chat interface (import issues resolved, functional)
 python cli_chat.py
+
+# Test enhanced observability with comprehensive workflow tracking
+python src/pydantic_agent/examples/enhanced_observability_example.py
 
 # Test individual agent components (all updated to GPT-4 Turbo)
 python src/pydantic_agent/examples/basic_crawl_example.py

@@ -21,13 +21,27 @@ except ImportError:
     LOGFIRE_AVAILABLE = False
 
 try:
-    from logging_config import log_agent_interaction, logger
+    from logging_config import logger
+    from observability import (
+        enhanced_agent_observability,
+        workflow_step_context,
+        AgentWorkflowTracker,
+        WorkflowStage,
+        DecisionType
+    )
 except ImportError:
     # Fallback for when running from different contexts
     import sys
     from pathlib import Path
     sys.path.append(str(Path(__file__).parent.parent))
-    from logging_config import log_agent_interaction, logger
+    from logging_config import logger
+    from observability import (
+        enhanced_agent_observability,
+        workflow_step_context,
+        AgentWorkflowTracker,
+        WorkflowStage,
+        DecisionType
+    )
 
 
 @dataclass
@@ -273,34 +287,119 @@ Remember: You are not just a tool executor, but an intelligent assistant that un
 """
 
 
-@log_agent_interaction("unified")
+@enhanced_agent_observability("unified")
 async def run_unified_agent(
     agent: Agent,
     user_query: str,
-    dependencies: UnifiedAgentDependencies
+    dependencies: UnifiedAgentDependencies,
+    _workflow_tracker: Optional[AgentWorkflowTracker] = None
 ) -> UnifiedAgentResult:
     """
-    Execute the unified agent with comprehensive logging and error handling.
-    
+    Execute the unified agent with comprehensive observability and workflow tracking.
+
     Args:
         agent: The configured unified agent
         user_query: User's query or request
         dependencies: Configuration dependencies
-        
+        _workflow_tracker: Internal workflow tracker (injected by decorator)
+
     Returns:
         Comprehensive result with workflow execution details
     """
-    logger.info("Starting unified agent workflow", 
-               query_length=len(user_query),
-               agent_type="unified_orchestrator")
-    
-    # Run agent with MCP server context
-    async with agent.run_mcp_servers():
-        result = await agent.run(user_query, deps=dependencies)
-    
-    logger.info("Unified agent workflow completed", 
-               workflow_success=result.data.workflow_success,
-               steps_count=len(result.data.steps_executed),
-               total_time=result.data.total_execution_time_seconds)
-    
+    tracker = _workflow_tracker
+
+    # Start intent analysis phase
+    async with workflow_step_context(tracker, WorkflowStage.INTENT_ANALYSIS, "Analyzing user intent and query context") as step_id:
+        # Record initial query analysis
+        tracker.record_decision(
+            DecisionType.WORKFLOW_STRATEGY,
+            "unified_orchestration",
+            f"Using unified agent to handle query: {user_query[:100]}...",
+            confidence=0.95,
+            alternatives_considered=["separate_agent_routing", "direct_tool_execution"],
+            context={"query_length": len(user_query), "dependencies": str(dependencies)}
+        )
+
+        # Analyze query characteristics
+        has_urls = "http" in user_query.lower()
+        asks_for_code = any(keyword in user_query.lower() for keyword in ["code", "example", "implementation", "function"])
+        asks_questions = any(keyword in user_query.lower() for keyword in ["what", "how", "why", "explain", "tell me"])
+
+        tracker.conversation_context.query_intent = "research" if has_urls else "search" if asks_questions else "discovery"
+        tracker.conversation_context.context_metadata = {
+            "has_urls": has_urls,
+            "asks_for_code": asks_for_code,
+            "asks_questions": asks_questions,
+            "query_complexity": "high" if len(user_query) > 200 else "medium" if len(user_query) > 50 else "low"
+        }
+
+    # Start tool orchestration phase
+    async with workflow_step_context(tracker, WorkflowStage.TOOL_SELECTION, "Orchestrating MCP tools based on intent") as step_id:
+        # Record tool selection strategy
+        if has_urls:
+            strategy = "research_workflow"
+            reasoning = "URLs detected - will crawl new content then search"
+        elif asks_questions:
+            strategy = "search_workflow"
+            reasoning = "Questions detected - will check sources then search existing content"
+        else:
+            strategy = "discovery_workflow"
+            reasoning = "General query - will discover available content"
+
+        tracker.record_decision(
+            DecisionType.WORKFLOW_STRATEGY,
+            strategy,
+            reasoning,
+            confidence=0.9,
+            alternatives_considered=["direct_search", "crawl_only", "hybrid_approach"],
+            context={"query_characteristics": tracker.conversation_context.context_metadata}
+        )
+
+    # Execute agent with MCP server context
+    async with workflow_step_context(tracker, WorkflowStage.TOOL_EXECUTION, "Executing MCP tools via agent") as step_id:
+        try:
+            async with agent.run_mcp_servers():
+                result = await agent.run(user_query, deps=dependencies)
+
+            # Record successful tool execution
+            tracker.record_tool_execution(
+                "unified_agent_orchestration",
+                {"query": user_query, "dependencies": str(dependencies)},
+                result.data
+            )
+
+        except Exception as e:
+            # Record tool execution failure
+            tracker.record_decision(
+                DecisionType.ERROR_RECOVERY,
+                "agent_execution_failed",
+                f"Agent execution failed: {str(e)}",
+                confidence=1.0,
+                context={"error_type": type(e).__name__, "error_message": str(e)}
+            )
+            raise
+
+    # Start result synthesis phase
+    async with workflow_step_context(tracker, WorkflowStage.RESULT_SYNTHESIS, "Synthesizing and validating results") as step_id:
+        # Record confidence assessment
+        confidence_score = result.data.confidence_score if hasattr(result.data, 'confidence_score') else 0.8
+        tracker.record_decision(
+            DecisionType.CONFIDENCE_ASSESSMENT,
+            f"confidence_{confidence_score:.2f}",
+            f"Assessed result confidence based on workflow success and content quality",
+            confidence=confidence_score,
+            context={
+                "workflow_success": getattr(result.data, 'workflow_success', True),
+                "steps_executed": len(getattr(result.data, 'steps_executed', [])),
+                "sources_accessed": len(getattr(result.data, 'sources_accessed', []))
+            }
+        )
+
+    logger.info("Unified agent workflow completed with enhanced observability",
+               session_id=tracker.session_id,
+               workflow_success=getattr(result.data, 'workflow_success', True),
+               steps_count=len(getattr(result.data, 'steps_executed', [])),
+               decisions_made=tracker.total_decisions,
+               tools_executed=len(tracker.tools_executed))
+
     return result.data

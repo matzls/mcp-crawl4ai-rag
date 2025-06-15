@@ -37,8 +37,8 @@ except ImportError:
     print("Rich not available, using basic CLI interface")
 
 from pydantic_agent.unified_agent import (
-    create_unified_agent, 
-    run_unified_agent, 
+    create_unified_agent,
+    run_unified_agent,
     UnifiedAgentDependencies
 )
 from logging_config import logger
