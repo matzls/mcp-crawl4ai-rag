@@ -68,7 +68,7 @@ def create_crawl_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
     # Create agent with MCP server - following documented pattern
     # Enable logfire instrumentation if available
     agent_kwargs = {
-        'model': 'openai:gpt-4-turbo',
+        'model': 'openai:o3',
         'deps_type': CrawlDependencies,
         'output_type': CrawlResult,
         'mcp_servers': [server],
@@ -135,7 +135,7 @@ def create_rag_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
     # Create agent with MCP server - following documented pattern
     # Enable logfire instrumentation if available
     agent_kwargs = {
-        'model': 'openai:gpt-4-turbo',
+        'model': 'openai:o3',
         'deps_type': RAGDependencies,
         'output_type': RAGResult,
         'mcp_servers': [server],
@@ -203,7 +203,7 @@ def create_workflow_agent(server_url: str = "http://localhost:8051/sse") -> Agen
     # Create agent with MCP server - following documented pattern
     # Enable logfire instrumentation if available
     agent_kwargs = {
-        'model': 'openai:gpt-4-turbo',
+        'model': 'openai:o3',
         'deps_type': WorkflowDependencies,
         'output_type': WorkflowResult,
         'mcp_servers': [server],
