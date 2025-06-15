@@ -5,7 +5,6 @@ This server provides tools to crawl websites using Crawl4AI, automatically detec
 the appropriate crawl method based on URL type (sitemap, txt file, or regular webpage).
 """
 from mcp.server.fastmcp import FastMCP, Context
-from sentence_transformers import CrossEncoder
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -13,7 +12,7 @@ from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse, urldefrag
 from xml.etree import ElementTree
 from dotenv import load_dotenv
-from supabase import Client
+import asyncpg
 from pathlib import Path
 import requests
 import asyncio
@@ -25,15 +24,24 @@ import concurrent.futures
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, MemoryAdaptiveDispatcher
 
 from utils import (
-    get_supabase_client, 
-    add_documents_to_supabase, 
+    create_postgres_pool,
+    add_documents_to_postgres,
     search_documents,
     extract_code_blocks,
     generate_code_example_summary,
-    add_code_examples_to_supabase,
+    add_code_examples_to_postgres,
     update_source_info,
     extract_source_summary,
-    search_code_examples
+    search_code_examples as search_code_examples_util
+)
+
+from logging_config import (
+    log_mcp_tool_execution,
+    log_database_operation,
+    log_crawling_operation,
+    log_rag_query,
+    log_system_startup,
+    logger
 )
 
 # Load environment variables from the project root .env file
@@ -48,8 +56,8 @@ load_dotenv(dotenv_path, override=True)
 class Crawl4AIContext:
     """Context for the Crawl4AI MCP server."""
     crawler: AsyncWebCrawler
-    supabase_client: Client
-    reranking_model: Optional[CrossEncoder] = None
+    postgres_pool: asyncpg.Pool
+    reranking_model: Optional[Any] = None  # CrossEncoder when available
 
 @asynccontextmanager
 async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
@@ -60,7 +68,7 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
         server: The FastMCP server instance
         
     Yields:
-        Crawl4AIContext: The context containing the Crawl4AI crawler and Supabase client
+        Crawl4AIContext: The context containing the Crawl4AI crawler and PostgreSQL pool
     """
     # Create browser configuration
     browser_config = BrowserConfig(
@@ -72,13 +80,14 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     crawler = AsyncWebCrawler(config=browser_config)
     await crawler.__aenter__()
     
-    # Initialize Supabase client
-    supabase_client = get_supabase_client()
+    # Initialize PostgreSQL connection pool
+    postgres_pool = await create_postgres_pool()
     
     # Initialize cross-encoder model for reranking if enabled
     reranking_model = None
     if os.getenv("USE_RERANKING", "false") == "true":
         try:
+            from sentence_transformers import CrossEncoder
             reranking_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
         except Exception as e:
             print(f"Failed to load reranking model: {e}")
@@ -87,12 +96,13 @@ async def crawl4ai_lifespan(server: FastMCP) -> AsyncIterator[Crawl4AIContext]:
     try:
         yield Crawl4AIContext(
             crawler=crawler,
-            supabase_client=supabase_client,
+            postgres_pool=postgres_pool,
             reranking_model=reranking_model
         )
     finally:
-        # Clean up the crawler
+        # Clean up the crawler and pool
         await crawler.__aexit__(None, None, None)
+        await postgres_pool.close()
 
 # Initialize FastMCP server
 mcp = FastMCP(
@@ -103,7 +113,7 @@ mcp = FastMCP(
     port=os.getenv("PORT", "8051")
 )
 
-def rerank_results(model: CrossEncoder, query: str, results: List[Dict[str, Any]], content_key: str = "content") -> List[Dict[str, Any]]:
+def rerank_results(model: Any, query: str, results: List[Dict[str, Any]], content_key: str = "content") -> List[Dict[str, Any]]:
     """
     Rerank search results using a cross-encoder model.
     
@@ -266,24 +276,30 @@ def process_code_example(args):
     return generate_code_example_summary(code, context_before, context_after)
 
 @mcp.tool()
+@log_mcp_tool_execution("crawl_single_page")
 async def crawl_single_page(ctx: Context, url: str) -> str:
     """
-    Crawl a single web page and store its content in Supabase.
+    Crawl a single web page and store its content in PostgreSQL for later retrieval.
     
-    This tool is ideal for quickly retrieving content from a specific URL without following links.
-    The content is stored in Supabase for later retrieval and querying.
+    USE WHEN: User wants content from ONE specific webpage without following links.
+    DON'T USE: For sitemaps, multiple pages, or recursive crawling (use smart_crawl_url instead).
+    
+    WORKFLOW: This tool STORES content. Follow with perform_rag_query to search stored content.
+    TYPICAL PATTERN: crawl_single_page → get_available_sources → perform_rag_query
     
     Args:
         ctx: The MCP server provided context
-        url: URL of the web page to crawl
+        url: Target webpage URL (e.g., "https://docs.python.org/3/tutorial/introduction.html")
     
     Returns:
-        Summary of the crawling operation and storage in Supabase
+        JSON with success status, chunks_stored count, content_length, source_id, and processing summary
+        
+    ERRORS: Network failures, invalid URLs, content extraction failures, database storage issues
     """
     try:
         # Get the crawler from the context
         crawler = ctx.request_context.lifespan_context.crawler
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        postgres_pool = ctx.request_context.lifespan_context.postgres_pool
         
         # Configure the crawl
         run_config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, stream=False)
@@ -299,7 +315,7 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
             # Chunk the content
             chunks = smart_chunk_markdown(result.markdown)
             
-            # Prepare data for Supabase
+            # Prepare data for PostgreSQL
             urls = []
             chunk_numbers = []
             contents = []
@@ -327,10 +343,10 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
             
             # Update source information FIRST (before inserting documents)
             source_summary = extract_source_summary(source_id, result.markdown[:5000])  # Use first 5000 chars for summary
-            update_source_info(supabase_client, source_id, source_summary, total_word_count)
+            await update_source_info(postgres_pool, source_id, source_summary, total_word_count)
             
-            # Add documentation chunks to Supabase (AFTER source exists)
-            add_documents_to_supabase(supabase_client, urls, chunk_numbers, contents, metadatas, url_to_full_document)
+            # Add documentation chunks to PostgreSQL (AFTER source exists)
+            await add_documents_to_postgres(postgres_pool, urls, chunk_numbers, contents, metadatas, url_to_full_document)
             
             # Extract and process code examples only if enabled
             extract_code_examples = os.getenv("USE_AGENTIC_RAG", "false") == "true"
@@ -369,9 +385,9 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                         }
                         code_metadatas.append(code_meta)
                     
-                    # Add code examples to Supabase
-                    add_code_examples_to_supabase(
-                        supabase_client, 
+                    # Add code examples to PostgreSQL
+                    await add_code_examples_to_postgres(
+                        postgres_pool, 
                         code_urls, 
                         code_chunk_numbers, 
                         code_examples, 
@@ -406,31 +422,41 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
         }, indent=2)
 
 @mcp.tool()
+@log_mcp_tool_execution("smart_crawl_url")
 async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concurrent: int = 10, chunk_size: int = 5000) -> str:
     """
-    Intelligently crawl a URL based on its type and store content in Supabase.
+    Intelligently crawl web content with automatic URL type detection and store in PostgreSQL.
     
-    This tool automatically detects the URL type and applies the appropriate crawling method:
-    - For sitemaps: Extracts and crawls all URLs in parallel
-    - For text files (llms.txt): Directly retrieves the content
-    - For regular webpages: Recursively crawls internal links up to the specified depth
+    USE WHEN: User wants to gather NEW content from websites, sitemaps, or documentation sites.
+    DON'T USE: If user is asking questions about EXISTING content (use perform_rag_query instead).
     
-    All crawled content is chunked and stored in Supabase for later retrieval and querying.
+    AUTOMATIC DETECTION & STRATEGY:
+    - Sitemap URLs (*.xml, */sitemap*): Extracts all URLs and crawls in parallel
+    - Text files (*.txt, *.md): Direct content retrieval without browser rendering
+    - Regular webpages: Recursive crawling following internal links up to max_depth
+    
+    WORKFLOW: This tool STORES content. Follow with get_available_sources → perform_rag_query to search it.
+    TYPICAL PATTERN: smart_crawl_url → get_available_sources → perform_rag_query/search_code_examples
     
     Args:
         ctx: The MCP server provided context
-        url: URL to crawl (can be a regular webpage, sitemap.xml, or .txt file)
-        max_depth: Maximum recursion depth for regular URLs (default: 3)
-        max_concurrent: Maximum number of concurrent browser sessions (default: 10)
-        chunk_size: Maximum size of each content chunk in characters (default: 1000)
+        url: Target URL - examples:
+             • "https://docs.python.org" (recursive webpage crawling)
+             • "https://site.com/sitemap.xml" (sitemap extraction) 
+             • "https://raw.github.com/user/repo/README.md" (direct text file)
+        max_depth: Link recursion depth for webpages (1-5, default: 3, higher=more pages)
+        max_concurrent: Parallel browser sessions (1-20, default: 10, higher=faster but more memory)
+        chunk_size: Content chunk size in characters (1000-10000, default: 5000)
     
     Returns:
-        JSON string with crawl summary and storage information
+        JSON with crawl_type, pages_crawled, chunks_stored, code_examples_stored, urls_crawled[]
+        
+    ERRORS: Network timeouts, invalid URLs, rate limiting, browser failures, storage errors
     """
     try:
         # Get the crawler from the context
         crawler = ctx.request_context.lifespan_context.crawler
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        postgres_pool = ctx.request_context.lifespan_context.postgres_pool
         
         # Determine the crawl strategy
         crawl_results = []
@@ -463,7 +489,7 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
                 "error": "No content found"
             }, indent=2)
         
-        # Process results and store in Supabase
+        # Process results and store in PostgreSQL
         urls = []
         chunk_numbers = []
         contents = []
@@ -520,14 +546,15 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
         
         for (source_id, _), summary in zip(source_summary_args, source_summaries):
             word_count = source_word_counts.get(source_id, 0)
-            update_source_info(supabase_client, source_id, summary, word_count)
+            await update_source_info(postgres_pool, source_id, summary, word_count)
         
-        # Add documentation chunks to Supabase (AFTER sources exist)
+        # Add documentation chunks to PostgreSQL (AFTER sources exist)
         batch_size = 20
-        add_documents_to_supabase(supabase_client, urls, chunk_numbers, contents, metadatas, url_to_full_document, batch_size=batch_size)
+        await add_documents_to_postgres(postgres_pool, urls, chunk_numbers, contents, metadatas, url_to_full_document, batch_size=batch_size)
         
         # Extract and process code examples from all documents only if enabled
         extract_code_examples_enabled = os.getenv("USE_AGENTIC_RAG", "false") == "true"
+        code_examples = []  # Initialize to empty list
         if extract_code_examples_enabled:
             all_code_blocks = []
             code_urls = []
@@ -572,10 +599,10 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
                         }
                         code_metadatas.append(code_meta)
             
-            # Add all code examples to Supabase
+            # Add all code examples to PostgreSQL
             if code_examples:
-                add_code_examples_to_supabase(
-                    supabase_client, 
+                await add_code_examples_to_postgres(
+                    postgres_pool, 
                     code_urls, 
                     code_chunk_numbers, 
                     code_examples, 
@@ -602,43 +629,49 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
         }, indent=2)
 
 @mcp.tool()
+@log_mcp_tool_execution("get_available_sources")
 async def get_available_sources(ctx: Context) -> str:
     """
-    Get all available sources from the sources table.
+    List all crawled content sources available for searching and querying.
     
-    This tool returns a list of all unique sources (domains) that have been crawled and stored
-    in the database, along with their summaries and statistics. This is useful for discovering 
-    what content is available for querying.
-
-    Always use this tool before calling the RAG query or code example query tool
-    with a specific source filter!
+    USE WHEN: Before performing searches to see what content is indexed, or when user asks "what do you know about?"
+    DON'T USE: For actually searching content (use perform_rag_query or search_code_examples instead).
+    
+    WORKFLOW: This is typically the FIRST step in search workflows to understand available content.
+    TYPICAL PATTERNS: 
+    • get_available_sources → perform_rag_query (with source filter)
+    • get_available_sources → search_code_examples (with source_id filter)
+    
+    ALWAYS USE: Before calling perform_rag_query or search_code_examples with source filtering!
     
     Args:
-        ctx: The MCP server provided context
+        ctx: The MCP server provided context (no parameters needed)
     
     Returns:
-        JSON string with the list of available sources and their details
+        JSON with sources[] array containing source_id, summary, total_words, created_at, updated_at
+        
+    ERRORS: Database connection failures, empty database (returns empty sources array)
     """
     try:
-        # Get the Supabase client from the context
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        # Get the PostgreSQL pool from the context
+        postgres_pool = ctx.request_context.lifespan_context.postgres_pool
         
         # Query the sources table directly
-        result = supabase_client.from_('sources')\
-            .select('*')\
-            .order('source_id')\
-            .execute()
+        async with postgres_pool.acquire() as conn:
+            result = await conn.fetch(
+                "SELECT source_id, summary, total_word_count, created_at, updated_at FROM sources ORDER BY source_id"
+            )
         
         # Format the sources with their details
         sources = []
-        if result.data:
-            for source in result.data:
+        if result:
+            for source in result:
                 sources.append({
-                    "source_id": source.get("source_id"),
-                    "summary": source.get("summary"),
-                    "total_words": source.get("total_words"),
-                    "created_at": source.get("created_at"),
-                    "updated_at": source.get("updated_at")
+                    "source_id": source["source_id"],
+                    "summary": source["summary"],
+                    "total_words": source["total_word_count"],
+                    "created_at": source["created_at"].isoformat() if source["created_at"] else None,
+                    "updated_at": source["updated_at"].isoformat() if source["updated_at"] else None
                 })
         
         return json.dumps({
@@ -653,26 +686,37 @@ async def get_available_sources(ctx: Context) -> str:
         }, indent=2)
 
 @mcp.tool()
+@log_mcp_tool_execution("perform_rag_query")
 async def perform_rag_query(ctx: Context, query: str, source: str = None, match_count: int = 5) -> str:
     """
-    Perform a RAG (Retrieval Augmented Generation) query on the stored content.
+    Search stored content using semantic similarity to answer questions and find relevant information.
     
-    This tool searches the vector database for content relevant to the query and returns
-    the matching documents. Optionally filter by source domain.
-    Get the source by using the get_available_sources tool before calling this search!
+    USE WHEN: User asks questions about topics, wants to find information, or needs content summaries.
+    DON'T USE: For gathering new content from web (use smart_crawl_url), or specifically for code (use search_code_examples).
+    
+    SEARCH CAPABILITIES:
+    • Vector similarity search using OpenAI embeddings
+    • Optional hybrid search (vector + keyword matching) if enabled
+    • Source filtering to search within specific domains
+    • Reranking for improved relevance if enabled
+    
+    WORKFLOW: Use get_available_sources first to see what content is available, then search it.
+    TYPICAL PATTERN: get_available_sources → perform_rag_query → (optional follow-up searches)
     
     Args:
         ctx: The MCP server provided context
-        query: The search query
-        source: Optional source domain to filter results (e.g., 'example.com')
-        match_count: Maximum number of results to return (default: 5)
+        query: Natural language search query (e.g., "Python async programming", "how to handle errors")
+        source: Optional source filter from get_available_sources (e.g., "docs.python.org", "github.com")
+        match_count: Number of results to return (1-20, default: 5, higher=more comprehensive)
     
     Returns:
-        JSON string with the search results
+        JSON with query, search_mode, results[] containing url, content, metadata, similarity scores
+        
+    ERRORS: Empty database, no matches found, embedding generation failures, database errors
     """
     try:
-        # Get the Supabase client from the context
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        # Get the PostgreSQL pool from the context
+        postgres_pool = ctx.request_context.lifespan_context.postgres_pool
         
         # Check if hybrid search is enabled
         use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false") == "true"
@@ -686,25 +730,32 @@ async def perform_rag_query(ctx: Context, query: str, source: str = None, match_
             # Hybrid search: combine vector and keyword search
             
             # 1. Get vector search results (get more to account for filtering)
-            vector_results = search_documents(
-                client=supabase_client,
+            vector_results = await search_documents(
+                pool=postgres_pool,
                 query=query,
                 match_count=match_count * 2,  # Get double to have room for filtering
                 filter_metadata=filter_metadata
             )
             
             # 2. Get keyword search results using ILIKE
-            keyword_query = supabase_client.from_('crawled_pages')\
-                .select('id, url, chunk_number, content, metadata, source_id')\
-                .ilike('content', f'%{query}%')
-            
-            # Apply source filter if provided
-            if source and source.strip():
-                keyword_query = keyword_query.eq('source_id', source)
-            
-            # Execute keyword search
-            keyword_response = keyword_query.limit(match_count * 2).execute()
-            keyword_results = keyword_response.data if keyword_response.data else []
+            async with postgres_pool.acquire() as conn:
+                keyword_query = """
+                    SELECT id, url, chunk_number, content, metadata, source_id 
+                    FROM crawled_pages 
+                    WHERE content ILIKE $1
+                """
+                query_params = [f'%{query}%']
+                
+                # Apply source filter if provided
+                if source and source.strip():
+                    keyword_query += " AND source_id = $2"
+                    query_params.append(source)
+                
+                keyword_query += f" LIMIT {match_count * 2}"
+                
+                # Execute keyword search
+                keyword_response = await conn.fetch(keyword_query, *query_params)
+                keyword_results = [dict(record) for record in keyword_response]
             
             # 3. Combine results with preference for items appearing in both
             seen_ids = set()
@@ -749,8 +800,8 @@ async def perform_rag_query(ctx: Context, query: str, source: str = None, match_
             
         else:
             # Standard vector search only
-            results = search_documents(
-                client=supabase_client,
+            results = await search_documents(
+                pool=postgres_pool,
                 query=query,
                 match_count=match_count,
                 filter_metadata=filter_metadata
@@ -792,24 +843,34 @@ async def perform_rag_query(ctx: Context, query: str, source: str = None, match_
         }, indent=2)
 
 @mcp.tool()
+@log_mcp_tool_execution("search_code_examples")
 async def search_code_examples(ctx: Context, query: str, source_id: str = None, match_count: int = 5) -> str:
     """
-    Search for code examples relevant to the query.
+    Search specifically for code examples and programming snippets with AI-generated summaries.
     
-    This tool searches the vector database for code examples relevant to the query and returns
-    the matching examples with their summaries. Optionally filter by source_id.
-    Get the source_id by using the get_available_sources tool before calling this search!
-
-    Use the get_available_sources tool first to see what sources are available for filtering.
+    USE WHEN: User specifically asks for code examples, programming snippets, or implementation details.
+    DON'T USE: For general information searches (use perform_rag_query), or if USE_AGENTIC_RAG=false.
+    
+    SPECIALIZED SEARCH:
+    • Targets extracted code blocks from crawled content
+    • Includes AI-generated summaries explaining what each code does
+    • Searches both code content and summaries for better matching
+    • Optional hybrid search combining vector and keyword matching
+    
+    AVAILABILITY: Only works if USE_AGENTIC_RAG=true in environment configuration.
+    WORKFLOW: Use get_available_sources first, then search for code within specific sources.
+    TYPICAL PATTERN: get_available_sources → search_code_examples (with source_id filter)
     
     Args:
         ctx: The MCP server provided context
-        query: The search query
-        source_id: Optional source ID to filter results (e.g., 'example.com')
-        match_count: Maximum number of results to return (default: 5)
+        query: Code-focused search query (e.g., "async function example", "error handling try catch", "class definition")
+        source_id: Optional source filter from get_available_sources (e.g., "docs.python.org", "github.com")
+        match_count: Number of code examples to return (1-15, default: 5)
     
     Returns:
-        JSON string with the search results
+        JSON with query, results[] containing url, code, summary, metadata, similarity scores
+        
+    ERRORS: Feature disabled (USE_AGENTIC_RAG=false), no code examples found, database errors
     """
     # Check if code example extraction is enabled
     extract_code_examples_enabled = os.getenv("USE_AGENTIC_RAG", "false") == "true"
@@ -820,8 +881,8 @@ async def search_code_examples(ctx: Context, query: str, source_id: str = None, 
         }, indent=2)
     
     try:
-        # Get the Supabase client from the context
-        supabase_client = ctx.request_context.lifespan_context.supabase_client
+        # Get the PostgreSQL pool from the context
+        postgres_pool = ctx.request_context.lifespan_context.postgres_pool
         
         # Check if hybrid search is enabled
         use_hybrid_search = os.getenv("USE_HYBRID_SEARCH", "false") == "true"
@@ -834,29 +895,34 @@ async def search_code_examples(ctx: Context, query: str, source_id: str = None, 
         if use_hybrid_search:
             # Hybrid search: combine vector and keyword search
             
-            # Import the search function from utils
-            from utils import search_code_examples as search_code_examples_impl
-            
             # 1. Get vector search results (get more to account for filtering)
-            vector_results = search_code_examples_impl(
-                client=supabase_client,
+            vector_results = await search_code_examples_util(
+                pool=postgres_pool,
                 query=query,
                 match_count=match_count * 2,  # Get double to have room for filtering
-                filter_metadata=filter_metadata
+                filter_metadata=filter_metadata,
+                source_id=source_id
             )
             
             # 2. Get keyword search results using ILIKE on both content and summary
-            keyword_query = supabase_client.from_('code_examples')\
-                .select('id, url, chunk_number, content, summary, metadata, source_id')\
-                .or_(f'content.ilike.%{query}%,summary.ilike.%{query}%')
-            
-            # Apply source filter if provided
-            if source_id and source_id.strip():
-                keyword_query = keyword_query.eq('source_id', source_id)
-            
-            # Execute keyword search
-            keyword_response = keyword_query.limit(match_count * 2).execute()
-            keyword_results = keyword_response.data if keyword_response.data else []
+            async with postgres_pool.acquire() as conn:
+                keyword_query = """
+                    SELECT id, url, chunk_number, content, summary, metadata, source_id 
+                    FROM code_examples 
+                    WHERE content ILIKE $1 OR summary ILIKE $1
+                """
+                query_params = [f'%{query}%']
+                
+                # Apply source filter if provided
+                if source_id and source_id.strip():
+                    keyword_query += " AND source_id = $2"
+                    query_params.append(source_id)
+                
+                keyword_query += f" LIMIT {match_count * 2}"
+                
+                # Execute keyword search
+                keyword_response = await conn.fetch(keyword_query, *query_params)
+                keyword_results = [dict(record) for record in keyword_response]
             
             # 3. Combine results with preference for items appearing in both
             seen_ids = set()
@@ -902,13 +968,12 @@ async def search_code_examples(ctx: Context, query: str, source_id: str = None, 
             
         else:
             # Standard vector search only
-            from utils import search_code_examples as search_code_examples_impl
-            
-            results = search_code_examples_impl(
-                client=supabase_client,
+            results = await search_code_examples_util(
+                pool=postgres_pool,
                 query=query,
                 match_count=match_count,
-                filter_metadata=filter_metadata
+                filter_metadata=filter_metadata,
+                source_id=source_id
             )
         
         # Apply reranking if enabled
@@ -1042,7 +1107,12 @@ async def crawl_recursive_internal_links(crawler: AsyncWebCrawler, start_urls: L
     return results_all
 
 async def main():
+    # Log system startup
+    log_system_startup("crawl4ai-mcp-server", "0.1.0")
+    
     transport = os.getenv("TRANSPORT", "sse")
+    logger.info(f"Starting MCP server with {transport} transport")
+    
     if transport == 'sse':
         # Run the MCP server with sse transport
         await mcp.run_sse_async()

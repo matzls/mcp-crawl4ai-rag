@@ -5,7 +5,7 @@ import os
 import concurrent.futures
 from typing import List, Dict, Any, Optional, Tuple
 import json
-from supabase import create_client, Client
+import asyncpg
 from urllib.parse import urlparse
 import openai
 import re
@@ -14,20 +14,67 @@ import time
 # Load OpenAI API key for embeddings
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def get_supabase_client() -> Client:
+async def get_postgres_connection() -> asyncpg.Connection:
     """
-    Get a Supabase client with the URL and key from environment variables.
+    Get a PostgreSQL connection using environment variables.
     
     Returns:
-        Supabase client instance
+        PostgreSQL connection instance
     """
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_KEY")
+    database_url = os.getenv("DATABASE_URL")
     
-    if not url or not key:
-        raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment variables")
+    if database_url:
+        return await asyncpg.connect(database_url)
     
-    return create_client(url, key)
+    # Fallback to individual components
+    host = os.getenv("POSTGRES_HOST", "localhost")
+    port = os.getenv("POSTGRES_PORT", "5432")
+    database = os.getenv("POSTGRES_DB", "crawl4ai_rag")
+    user = os.getenv("POSTGRES_USER", "postgres")
+    password = os.getenv("POSTGRES_PASSWORD")
+    
+    if not password:
+        raise ValueError("Either DATABASE_URL or POSTGRES_PASSWORD must be set in environment variables")
+    
+    return await asyncpg.connect(
+        host=host,
+        port=int(port),
+        database=database,
+        user=user,
+        password=password
+    )
+
+async def create_postgres_pool() -> asyncpg.Pool:
+    """
+    Create a PostgreSQL connection pool.
+    
+    Returns:
+        PostgreSQL connection pool
+    """
+    database_url = os.getenv("DATABASE_URL")
+    
+    if database_url:
+        return await asyncpg.create_pool(database_url, min_size=2, max_size=10)
+    
+    # Fallback to individual components
+    host = os.getenv("POSTGRES_HOST", "localhost")
+    port = os.getenv("POSTGRES_PORT", "5432")
+    database = os.getenv("POSTGRES_DB", "crawl4ai_rag")
+    user = os.getenv("POSTGRES_USER", "postgres")
+    password = os.getenv("POSTGRES_PASSWORD")
+    
+    if not password:
+        raise ValueError("Either DATABASE_URL or POSTGRES_PASSWORD must be set in environment variables")
+    
+    return await asyncpg.create_pool(
+        host=host,
+        port=int(port),
+        database=database,
+        user=user,
+        password=password,
+        min_size=2,
+        max_size=10
+    )
 
 def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
     """
@@ -84,10 +131,10 @@ def create_embeddings_batch(texts: List[str]) -> List[List[float]]:
 def create_embedding(text: str) -> List[float]:
     """
     Create an embedding for a single text using OpenAI's API.
-    
+
     Args:
         text: Text to create an embedding for
-        
+
     Returns:
         List of floats representing the embedding
     """
@@ -98,6 +145,18 @@ def create_embedding(text: str) -> List[float]:
         print(f"Error creating embedding: {e}")
         # Return empty embedding if there's an error
         return [0.0] * 1536
+
+def embedding_to_vector_string(embedding: List[float]) -> str:
+    """
+    Convert a Python list embedding to PostgreSQL vector string format.
+
+    Args:
+        embedding: List of floats representing the embedding
+
+    Returns:
+        String representation suitable for PostgreSQL vector type
+    """
+    return '[' + ','.join(map(str, embedding)) + ']'
 
 def generate_contextual_embedding(full_document: str, chunk: str) -> Tuple[str, bool]:
     """
@@ -164,8 +223,8 @@ def process_chunk_with_context(args):
     url, content, full_document = args
     return generate_contextual_embedding(full_document, content)
 
-def add_documents_to_supabase(
-    client: Client, 
+async def add_documents_to_postgres(
+    pool: asyncpg.Pool, 
     urls: List[str], 
     chunk_numbers: List[int],
     contents: List[str], 
@@ -174,11 +233,11 @@ def add_documents_to_supabase(
     batch_size: int = 20
 ) -> None:
     """
-    Add documents to the Supabase crawled_pages table in batches.
+    Add documents to the PostgreSQL crawled_pages table in batches.
     Deletes existing records with the same URLs before inserting to prevent duplicates.
     
     Args:
-        client: Supabase client
+        pool: PostgreSQL connection pool
         urls: List of URLs
         chunk_numbers: List of chunk numbers
         contents: List of document contents
@@ -189,20 +248,24 @@ def add_documents_to_supabase(
     # Get unique URLs to delete existing records
     unique_urls = list(set(urls))
     
-    # Delete existing records for these URLs in a single operation
-    try:
-        if unique_urls:
-            # Use the .in_() filter to delete all records with matching URLs
-            client.table("crawled_pages").delete().in_("url", unique_urls).execute()
-    except Exception as e:
-        print(f"Batch delete failed: {e}. Trying one-by-one deletion as fallback.")
-        # Fallback: delete records one by one
-        for url in unique_urls:
-            try:
-                client.table("crawled_pages").delete().eq("url", url).execute()
-            except Exception as inner_e:
-                print(f"Error deleting record for URL {url}: {inner_e}")
-                # Continue with the next URL even if one fails
+    # Delete existing records for these URLs
+    async with pool.acquire() as conn:
+        try:
+            if unique_urls:
+                # Delete all records with matching URLs
+                await conn.execute(
+                    "DELETE FROM crawled_pages WHERE url = ANY($1)",
+                    unique_urls
+                )
+        except Exception as e:
+            print(f"Batch delete failed: {e}. Trying one-by-one deletion as fallback.")
+            # Fallback: delete records one by one
+            for url in unique_urls:
+                try:
+                    await conn.execute("DELETE FROM crawled_pages WHERE url = $1", url)
+                except Exception as inner_e:
+                    print(f"Error deleting record for URL {url}: {inner_e}")
+                    # Continue with the next URL even if one fails
     
     # Check if MODEL_CHOICE is set for contextual embeddings
     use_contextual_embeddings = os.getenv("USE_CONTEXTUAL_EMBEDDINGS", "false") == "true"
@@ -283,18 +346,35 @@ def add_documents_to_supabase(
             
             batch_data.append(data)
         
-        # Insert batch into Supabase with retry logic
+        # Insert batch into PostgreSQL with retry logic
         max_retries = 3
         retry_delay = 1.0  # Start with 1 second delay
         
         for retry in range(max_retries):
             try:
-                client.table("crawled_pages").insert(batch_data).execute()
+                async with pool.acquire() as conn:
+                    # Prepare batch insert query
+                    insert_query = """
+                        INSERT INTO crawled_pages (url, chunk_number, content, metadata, source_id, embedding)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                    """
+                    
+                    # Insert all records in the batch
+                    for data in batch_data:
+                        await conn.execute(
+                            insert_query,
+                            data["url"],
+                            data["chunk_number"],
+                            data["content"],
+                            json.dumps(data["metadata"]),
+                            data["source_id"],
+                            embedding_to_vector_string(data["embedding"])
+                        )
                 # Success - break out of retry loop
                 break
             except Exception as e:
                 if retry < max_retries - 1:
-                    print(f"Error inserting batch into Supabase (attempt {retry + 1}/{max_retries}): {e}")
+                    print(f"Error inserting batch into PostgreSQL (attempt {retry + 1}/{max_retries}): {e}")
                     print(f"Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
@@ -304,27 +384,36 @@ def add_documents_to_supabase(
                     # Optionally, try inserting records one by one as a last resort
                     print("Attempting to insert records individually...")
                     successful_inserts = 0
-                    for record in batch_data:
-                        try:
-                            client.table("crawled_pages").insert(record).execute()
-                            successful_inserts += 1
-                        except Exception as individual_error:
-                            print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
+                    async with pool.acquire() as conn:
+                        for record in batch_data:
+                            try:
+                                await conn.execute(
+                                    insert_query,
+                                    record["url"],
+                                    record["chunk_number"],
+                                    record["content"],
+                                    json.dumps(record["metadata"]),
+                                    record["source_id"],
+                                    embedding_to_vector_string(record["embedding"])
+                                )
+                                successful_inserts += 1
+                            except Exception as individual_error:
+                                print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
                     
                     if successful_inserts > 0:
                         print(f"Successfully inserted {successful_inserts}/{len(batch_data)} records individually")
 
-def search_documents(
-    client: Client, 
+async def search_documents(
+    pool: asyncpg.Pool, 
     query: str, 
     match_count: int = 10, 
     filter_metadata: Optional[Dict[str, Any]] = None
 ) -> List[Dict[str, Any]]:
     """
-    Search for documents in Supabase using vector similarity.
+    Search for documents in PostgreSQL using vector similarity.
     
     Args:
-        client: Supabase client
+        pool: PostgreSQL connection pool
         query: Query text
         match_count: Maximum number of results to return
         filter_metadata: Optional metadata filter
@@ -337,19 +426,22 @@ def search_documents(
     
     # Execute the search using the match_crawled_pages function
     try:
-        # Only include filter parameter if filter_metadata is provided and not empty
-        params = {
-            'query_embedding': query_embedding,
-            'match_count': match_count
-        }
-        
-        # Only add the filter if it's actually provided and not empty
-        if filter_metadata:
-            params['filter'] = filter_metadata  # Pass the dictionary directly, not JSON-encoded
-        
-        result = client.rpc('match_crawled_pages', params).execute()
-        
-        return result.data
+        async with pool.acquire() as conn:
+            # Prepare filter parameter
+            filter_json = json.dumps(filter_metadata) if filter_metadata else '{}'
+            source_filter = filter_metadata.get('source') if filter_metadata else None
+            
+            # Call the match_crawled_pages function
+            result = await conn.fetch(
+                "SELECT * FROM match_crawled_pages($1, $2, $3, $4)",
+                embedding_to_vector_string(query_embedding),
+                match_count,
+                filter_json,
+                source_filter
+            )
+            
+            # Convert records to dictionaries
+            return [dict(record) for record in result]
     except Exception as e:
         print(f"Error searching documents: {e}")
         return []
@@ -485,8 +577,8 @@ Based on the code example and its surrounding context, provide a concise summary
         return "Code example for demonstration purposes."
 
 
-def add_code_examples_to_supabase(
-    client: Client,
+async def add_code_examples_to_postgres(
+    pool: asyncpg.Pool,
     urls: List[str],
     chunk_numbers: List[int],
     code_examples: List[str],
@@ -495,10 +587,10 @@ def add_code_examples_to_supabase(
     batch_size: int = 20
 ):
     """
-    Add code examples to the Supabase code_examples table in batches.
+    Add code examples to the PostgreSQL code_examples table in batches.
     
     Args:
-        client: Supabase client
+        pool: PostgreSQL connection pool
         urls: List of URLs
         chunk_numbers: List of chunk numbers
         code_examples: List of code example contents
@@ -511,11 +603,12 @@ def add_code_examples_to_supabase(
         
     # Delete existing records for these URLs
     unique_urls = list(set(urls))
-    for url in unique_urls:
-        try:
-            client.table('code_examples').delete().eq('url', url).execute()
-        except Exception as e:
-            print(f"Error deleting existing code examples for {url}: {e}")
+    async with pool.acquire() as conn:
+        for url in unique_urls:
+            try:
+                await conn.execute("DELETE FROM code_examples WHERE url = $1", url)
+            except Exception as e:
+                print(f"Error deleting existing code examples for {url}: {e}")
     
     # Process in batches
     total_items = len(urls)
@@ -561,18 +654,36 @@ def add_code_examples_to_supabase(
                 'embedding': embedding
             })
         
-        # Insert batch into Supabase with retry logic
+        # Insert batch into PostgreSQL with retry logic
         max_retries = 3
         retry_delay = 1.0  # Start with 1 second delay
         
         for retry in range(max_retries):
             try:
-                client.table('code_examples').insert(batch_data).execute()
+                async with pool.acquire() as conn:
+                    # Prepare batch insert query
+                    insert_query = """
+                        INSERT INTO code_examples (url, chunk_number, content, summary, metadata, source_id, embedding)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    """
+                    
+                    # Insert all records in the batch
+                    for data in batch_data:
+                        await conn.execute(
+                            insert_query,
+                            data['url'],
+                            data['chunk_number'],
+                            data['content'],
+                            data['summary'],
+                            json.dumps(data['metadata']),
+                            data['source_id'],
+                            embedding_to_vector_string(data['embedding'])
+                        )
                 # Success - break out of retry loop
                 break
             except Exception as e:
                 if retry < max_retries - 1:
-                    print(f"Error inserting batch into Supabase (attempt {retry + 1}/{max_retries}): {e}")
+                    print(f"Error inserting batch into PostgreSQL (attempt {retry + 1}/{max_retries}): {e}")
                     print(f"Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
@@ -582,47 +693,63 @@ def add_code_examples_to_supabase(
                     # Optionally, try inserting records one by one as a last resort
                     print("Attempting to insert records individually...")
                     successful_inserts = 0
-                    for record in batch_data:
-                        try:
-                            client.table('code_examples').insert(record).execute()
-                            successful_inserts += 1
-                        except Exception as individual_error:
-                            print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
+                    async with pool.acquire() as conn:
+                        for record in batch_data:
+                            try:
+                                await conn.execute(
+                                    insert_query,
+                                    record['url'],
+                                    record['chunk_number'],
+                                    record['content'],
+                                    record['summary'],
+                                    json.dumps(record['metadata']),
+                                    record['source_id'],
+                                    embedding_to_vector_string(record['embedding'])
+                                )
+                                successful_inserts += 1
+                            except Exception as individual_error:
+                                print(f"Failed to insert individual record for URL {record['url']}: {individual_error}")
                     
                     if successful_inserts > 0:
                         print(f"Successfully inserted {successful_inserts}/{len(batch_data)} records individually")
         print(f"Inserted batch {i//batch_size + 1} of {(total_items + batch_size - 1)//batch_size} code examples")
 
 
-def update_source_info(client: Client, source_id: str, summary: str, word_count: int):
+async def update_source_info(pool: asyncpg.Pool, source_id: str, summary: str, word_count: int):
     """
     Update or insert source information in the sources table.
     
     Args:
-        client: Supabase client
+        pool: PostgreSQL connection pool
         source_id: The source ID (domain)
         summary: Summary of the source
         word_count: Total word count for the source
     """
     try:
-        # Try to update existing source
-        result = client.table('sources').update({
-            'summary': summary,
-            'total_word_count': word_count,
-            'updated_at': 'now()'
-        }).eq('source_id', source_id).execute()
-        
-        # If no rows were updated, insert new source
-        if not result.data:
-            client.table('sources').insert({
-                'source_id': source_id,
-                'summary': summary,
-                'total_word_count': word_count
-            }).execute()
-            print(f"Created new source: {source_id}")
-        else:
-            print(f"Updated source: {source_id}")
+        async with pool.acquire() as conn:
+            # Try to update existing source
+            result = await conn.execute(
+                """
+                UPDATE sources 
+                SET summary = $2, total_word_count = $3, updated_at = NOW() 
+                WHERE source_id = $1
+                """,
+                source_id, summary, word_count
+            )
             
+            # If no rows were updated, insert new source
+            if result == "UPDATE 0":
+                await conn.execute(
+                    """
+                    INSERT INTO sources (source_id, summary, total_word_count) 
+                    VALUES ($1, $2, $3)
+                    """,
+                    source_id, summary, word_count
+                )
+                print(f"Created new source: {source_id}")
+            else:
+                print(f"Updated source: {source_id}")
+                
     except Exception as e:
         print(f"Error updating source {source_id}: {e}")
 
@@ -687,18 +814,18 @@ The above content is from the documentation for '{source_id}'. Please provide a 
         return default_summary
 
 
-def search_code_examples(
-    client: Client, 
+async def search_code_examples(
+    pool: asyncpg.Pool, 
     query: str, 
     match_count: int = 10, 
     filter_metadata: Optional[Dict[str, Any]] = None,
     source_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    Search for code examples in Supabase using vector similarity.
+    Search for code examples in PostgreSQL using vector similarity.
     
     Args:
-        client: Supabase client
+        pool: PostgreSQL connection pool
         query: Query text
         match_count: Maximum number of results to return
         filter_metadata: Optional metadata filter
@@ -716,23 +843,22 @@ def search_code_examples(
     
     # Execute the search using the match_code_examples function
     try:
-        # Only include filter parameter if filter_metadata is provided and not empty
-        params = {
-            'query_embedding': query_embedding,
-            'match_count': match_count
-        }
-        
-        # Only add the filter if it's actually provided and not empty
-        if filter_metadata:
-            params['filter'] = filter_metadata
+        async with pool.acquire() as conn:
+            # Prepare filter parameter
+            filter_json = json.dumps(filter_metadata) if filter_metadata else '{}'
+            source_filter = source_id
             
-        # Add source filter if provided
-        if source_id:
-            params['source_filter'] = source_id
-        
-        result = client.rpc('match_code_examples', params).execute()
-        
-        return result.data
+            # Call the match_code_examples function
+            result = await conn.fetch(
+                "SELECT * FROM match_code_examples($1, $2, $3, $4)",
+                embedding_to_vector_string(query_embedding),
+                match_count,
+                filter_json,
+                source_filter
+            )
+            
+            # Convert records to dictionaries
+            return [dict(record) for record in result]
     except Exception as e:
         print(f"Error searching code examples: {e}")
         return []
