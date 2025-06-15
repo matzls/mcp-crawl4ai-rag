@@ -9,8 +9,13 @@ from typing import Optional, List, Any
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.mcp import MCPServerHTTP
 
-from .dependencies import CrawlDependencies, RAGDependencies, WorkflowDependencies
-from .outputs import CrawlResult, RAGResult, WorkflowResult
+try:
+    from .dependencies import CrawlDependencies, RAGDependencies, WorkflowDependencies
+    from .outputs import CrawlResult, RAGResult, WorkflowResult
+except ImportError:
+    # Fallback for when running from different contexts
+    from pydantic_agent.dependencies import CrawlDependencies, RAGDependencies, WorkflowDependencies
+    from pydantic_agent.outputs import CrawlResult, RAGResult, WorkflowResult
 
 # Import logfire for Pydantic AI integration
 try:
@@ -22,7 +27,14 @@ except ImportError:
     LOGFIRE_AVAILABLE = False
 
 # Import logging utilities
-from ..logging_config import log_agent_interaction, logger
+try:
+    from logging_config import log_agent_interaction, logger
+except ImportError:
+    # Fallback for when running from different contexts
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from logging_config import log_agent_interaction, logger
 
 
 async def create_mcp_connection(server_url: str) -> MCPServerHTTP:
@@ -56,7 +68,7 @@ def create_crawl_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
     # Create agent with MCP server - following documented pattern
     # Enable logfire instrumentation if available
     agent_kwargs = {
-        'model': 'openai:gpt-4o',
+        'model': 'openai:gpt-4-turbo',
         'deps_type': CrawlDependencies,
         'output_type': CrawlResult,
         'mcp_servers': [server],
@@ -123,7 +135,7 @@ def create_rag_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
     # Create agent with MCP server - following documented pattern
     # Enable logfire instrumentation if available
     agent_kwargs = {
-        'model': 'openai:gpt-4o',
+        'model': 'openai:gpt-4-turbo',
         'deps_type': RAGDependencies,
         'output_type': RAGResult,
         'mcp_servers': [server],
@@ -191,7 +203,7 @@ def create_workflow_agent(server_url: str = "http://localhost:8051/sse") -> Agen
     # Create agent with MCP server - following documented pattern
     # Enable logfire instrumentation if available
     agent_kwargs = {
-        'model': 'openai:gpt-4o',
+        'model': 'openai:gpt-4-turbo',
         'deps_type': WorkflowDependencies,
         'output_type': WorkflowResult,
         'mcp_servers': [server],

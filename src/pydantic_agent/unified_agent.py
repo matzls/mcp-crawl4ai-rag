@@ -20,7 +20,14 @@ try:
 except ImportError:
     LOGFIRE_AVAILABLE = False
 
-from ..logging_config import log_agent_interaction, logger
+try:
+    from logging_config import log_agent_interaction, logger
+except ImportError:
+    # Fallback for when running from different contexts
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from logging_config import log_agent_interaction, logger
 
 
 @dataclass
@@ -118,8 +125,8 @@ def create_unified_agent(server_url: str = "http://localhost:8051/sse") -> Agent
     
     # Build agent configuration
     agent_kwargs = {
-        'model': 'openai:o3',
-        'deps_type': UnifiedAgentDependencies, 
+        'model': 'openai:gpt-4-turbo',
+        'deps_type': UnifiedAgentDependencies,
         'output_type': UnifiedAgentResult,
         'mcp_servers': [server],
         'system_prompt': _build_intelligent_system_prompt()

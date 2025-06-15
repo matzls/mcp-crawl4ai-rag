@@ -43,7 +43,7 @@ async def basic_rag_example():
         
         # Configure RAG agent
         agent = Agent(
-            'openai:gpt-4o',
+            'openai:gpt-4-turbo',
             deps_type=RAGDependencies,
             output_type=RAGResult,
             mcp_servers=[server],
@@ -118,7 +118,7 @@ async def research_workflow_example():
         
         # Configure workflow agent
         agent = Agent(
-            'openai:gpt-4o',
+            'openai:gpt-4-turbo',
             deps_type=WorkflowDependencies,
             output_type=WorkflowResult,
             mcp_servers=[server],
@@ -201,7 +201,7 @@ async def interactive_rag_example():
     server = MCPServerHTTP(url=deps.mcp_server_url)
     
     agent = Agent(
-        'openai:gpt-4o',
+        'openai:gpt-4-turbo',
         deps_type=RAGDependencies,
         output_type=RAGResult,
         mcp_servers=[server],
