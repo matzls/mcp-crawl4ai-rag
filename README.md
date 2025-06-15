@@ -58,6 +58,7 @@ The Crawl4AI RAG MCP server is just the beginning. Here's where we're headed:
 - **Structured Outputs**: Validated responses with comprehensive metadata
 - **Agent Specialization**: Dedicated agents for crawling, RAG queries, and workflow orchestration
 - **MCP Client Integration**: Seamless connection to MCP server using documented patterns
+- **Standard Logfire Observability**: Built-in tracing and monitoring using Pydantic AI's native Logfire integration
 
 ## Tools
 
@@ -197,6 +198,7 @@ async with agent.run_mcp_servers():
 - **✅ MCP Integration**: Follows documented patterns with `MCPServerSSE` and `agent.run_mcp_servers()` - **Verified working**
 - **✅ Error Handling**: Graceful error handling with informative error messages - **Robust and tested**
 - **✅ Performance**: Tested with large-scale operations (197 pages, 856 chunks) - **Production validated**
+- **✅ Logfire Observability**: Standard Pydantic AI instrumentation with real-time tracing - **Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent**
 
 ### Testing Results
 
@@ -260,7 +262,7 @@ The Pydantic AI agent implementation has undergone comprehensive testing with ex
    This will install all required dependencies including:
    - `crawl4ai==0.6.2` - Web crawling capabilities
    - `mcp>=1.9.4` - Model Context Protocol framework
-   - `pydantic-ai[logfire]>=0.2.18` - Intelligent agent framework
+   - `pydantic-ai[logfire]>=0.2.18` - Intelligent agent framework with built-in Logfire observability
    - `asyncpg==0.30.0` - PostgreSQL async driver
    - `openai>=1.86.0` - OpenAI API integration
    - `sentence-transformers>=4.1.0` - Embedding models
@@ -346,6 +348,9 @@ TRANSPORT=sse
 # OpenAI API Configuration
 OPENAI_API_KEY=your_openai_api_key
 
+# Logfire Observability (Optional)
+LOGFIRE_TOKEN=your_logfire_token
+
 # LLM for summaries and contextual embeddings
 MODEL_CHOICE=gpt-4o-mini
 
@@ -365,6 +370,30 @@ DATABASE_URL=postgresql://mg:@localhost:5432/crawl4ai_rag
 # POSTGRES_USER=mg
 # POSTGRES_PASSWORD=
 ```
+
+### Observability & Monitoring
+
+The system includes comprehensive observability through **Pydantic AI's built-in Logfire integration**:
+
+#### Features
+- **Automatic Agent Tracing**: All agent runs are automatically traced with nested spans
+- **HTTP Request Monitoring**: Raw OpenAI API requests/responses visible for debugging
+- **MCP Tool Performance**: Execution times, success rates, and result summaries
+- **Error Tracking**: Exception details with stack traces and context
+- **Real-time Dashboard**: Live monitoring during agent execution
+
+#### Setup
+1. **Get Logfire Token**: Sign up at [logfire.pydantic.dev](https://logfire.pydantic.dev)
+2. **Add to Environment**: Set `LOGFIRE_TOKEN=your_token` in your `.env` file
+3. **Automatic Configuration**: Logfire is automatically configured when agents start
+4. **View Dashboard**: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent
+
+#### What You'll See
+- Complete agent workflow traces with timing information
+- Tool selection and execution details
+- OpenAI API calls with token usage and response times
+- Error context and recovery attempts
+- Performance metrics and bottleneck identification
 
 ### RAG Strategy Options
 

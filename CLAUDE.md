@@ -218,35 +218,33 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 
 ### Observability & Logging
 
-#### Enhanced Observability - PRODUCTION READY (Updated 2025-01-15)
-- **Comprehensive Agent Workflow Tracking**: Complete visibility into agent decision-making processes
-- **Decision-Making Instrumentation**: Captures tool selection reasoning, confidence assessments, and alternatives considered
-- **Multi-Stage Workflow Monitoring**: Tracks intent analysis, tool selection, execution, and result synthesis phases
-- **Performance Analysis**: Detailed timing metrics, bottleneck identification, and efficiency ratios
-- **Error Context Preservation**: Enhanced error categorization with recovery attempt tracking
-- **Conversation Context Management**: Session tracking with user intent analysis and preference learning
+#### Standard Logfire Integration - PRODUCTION READY (Updated 2025-01-15)
+- **Pydantic AI Built-in Instrumentation**: Uses `logfire.instrument_pydantic_ai()` for automatic agent tracing
+- **HTTP Request Monitoring**: `logfire.instrument_httpx()` captures raw prompts and responses
+- **MCP Tool Execution Logging**: Simple `@log_mcp_tool_execution` decorator with basic metrics
+- **Error Tracking**: Structured error logging with context and timing information
+- **Dashboard Integration**: Real-time traces in Logfire dashboard with automatic configuration
 
-#### Advanced Logging Architecture
-- **Enhanced MCP Tool Instrumentation**: `@log_mcp_tool_execution` with performance analysis and error categorization
-- **Agent Workflow Tracking**: `@enhanced_agent_observability` decorator with comprehensive decision logging
-- **Structured Decision Recording**: Captures reasoning, confidence, alternatives, and context for each agent decision
-- **Multi-Level Context Tracking**: Session, conversation, workflow, and tool execution contexts
-- **Performance Profiling**: Execution timing analysis with expected duration comparisons
+#### Simple Logging Architecture
+- **Standard Instrumentation**: Uses Pydantic AI's built-in Logfire support instead of custom decorators
+- **Basic MCP Tool Logging**: `@log_mcp_tool_execution` with execution time, success/failure, and result summaries
+- **Automatic Agent Tracing**: Pydantic AI automatically creates spans for agent runs and tool calls
+- **HTTP Visibility**: Raw OpenAI API requests/responses visible in Logfire for debugging
+- **Clean Error Handling**: Simple error logging without complex categorization
 
 #### Observability Components
-- **Core Module**: `src/observability.py` - Comprehensive workflow tracking and decision instrumentation
-- **Enhanced Logging**: `src/logging_config.py` - Advanced MCP tool logging with error analysis
-- **Unified Agent Integration**: Enhanced `run_unified_agent` with workflow stage tracking
-- **CLI Interface**: Real-time observability feedback in chat interface
-- **Example Demonstrations**: `enhanced_observability_example.py` with comprehensive workflow examples
+- **Logging Configuration**: `src/logging_config.py` - Simple MCP tool logging with basic metrics
+- **Agent Setup**: `setup_logfire_instrumentation()` in unified agent for automatic configuration
+- **CLI Integration**: Automatic Logfire setup on startup with dashboard link display
+- **Standard Patterns**: Uses Logfire's recommended instrumentation patterns
 
-#### Logfire Dashboard Features (Enhanced)
-- **Agent Decision Traces**: Complete decision-making process with reasoning and alternatives
-- **Workflow Stage Visualization**: Intent analysis → Tool selection → Execution → Synthesis phases
-- **Performance Optimization Insights**: Slow execution detection, efficiency analysis, resource usage
-- **Error Recovery Tracking**: Error categorization, recovery attempts, and success rates
-- **Conversation Intelligence**: User intent patterns, preference learning, context evolution
-- **Advanced Filtering**: Search by decision type, workflow stage, performance metrics, error categories
+#### Logfire Dashboard Features
+- **Agent Execution Traces**: Complete agent runs with nested tool calls and timing
+- **HTTP Request Details**: Raw prompts, responses, and token usage from OpenAI API
+- **MCP Tool Performance**: Execution times, success rates, and result summaries
+- **Error Tracking**: Exception details with stack traces and context
+- **Real-time Monitoring**: Live traces during agent execution
+- **Dashboard URL**: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent
 </project_architecture>
 
 <current_tasks>
@@ -274,7 +272,7 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 - [x] Streamline CLAUDE.md file by removing redundant sections and condensing verbose content (2025-01-13) - TASK-022
 - [x] Implement comprehensive logfire logging for both MCP server and Pydantic AI agents (2025-01-13) - TASK-023
 - [x] Complete unified agent architecture implementation with GPT-4.1 integration and import fixes (2025-01-15) - TASK-024
-- [x] Implement comprehensive observability for Pydantic AI agent workflow with decision tracking and performance analysis (2025-01-15) - TASK-032
+- [x] Implement simplified observability using Pydantic AI's built-in Logfire integration (2025-01-15) - TASK-032
 
 ### Backlog
 <!-- Future tasks and improvements -->
@@ -382,17 +380,14 @@ psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_
 # Test logfire logging setup
 python test_logging.py
 
-# Run comprehensive logging demonstration
+# Run basic logging demonstration
 python src/pydantic_agent/examples/logging_example.py
 
 # Test unified agent architecture (GPT-4 Turbo configured)
 python src/pydantic_agent/examples/unified_agent_example.py
 
-# Interactive CLI chat interface (import issues resolved, functional)
+# Interactive CLI chat interface with standard Logfire observability
 python cli_chat.py
-
-# Test enhanced observability with comprehensive workflow tracking
-python src/pydantic_agent/examples/enhanced_observability_example.py
 
 # Test individual agent components (all updated to GPT-4 Turbo)
 python src/pydantic_agent/examples/basic_crawl_example.py

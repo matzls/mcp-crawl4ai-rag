@@ -6,11 +6,9 @@ Pydantic AI agent interactions, following best practices for structured logging.
 """
 
 import os
-import sys
-from typing import Any, Dict, Optional
+from typing import Optional
 from functools import wraps
 import time
-import asyncio
 
 try:
     import logfire
@@ -78,7 +76,7 @@ logger = get_logger()
 
 def log_mcp_tool_execution(tool_name: str):
     """
-    Enhanced decorator for logging MCP tool execution with comprehensive metrics and context.
+    Simple decorator for logging MCP tool execution with basic metrics.
 
     Args:
         tool_name: Name of the MCP tool being executed
@@ -92,9 +90,6 @@ def log_mcp_tool_execution(tool_name: str):
             safe_kwargs = {k: v for k, v in kwargs.items()
                           if not any(sensitive in k.lower() for sensitive in ['token', 'key', 'password'])}
 
-            # Extract context information if available
-            ctx = args[0] if args and hasattr(args[0], 'request_context') else None
-
             if LOGFIRE_AVAILABLE:
                 with logger.span(f"mcp_tool_{tool_name}") as span:
                     span.set_attributes({
@@ -102,191 +97,67 @@ def log_mcp_tool_execution(tool_name: str):
                         'tool.parameters': safe_kwargs,
                         'tool.args_count': len(args),
                         'execution.start_time': start_time,
-                        'tool.category': _get_tool_category(tool_name),
-                        'tool.expected_duration': _get_expected_duration(tool_name)
                     })
-
-                    # Add context-specific attributes
-                    if ctx:
-                        span.set_attributes({
-                            'context.has_crawler': hasattr(ctx.request_context.lifespan_context, 'crawler'),
-                            'context.has_postgres': hasattr(ctx.request_context.lifespan_context, 'postgres_pool'),
-                            'context.has_reranking': hasattr(ctx.request_context.lifespan_context, 'reranking_model')
-                        })
 
                     try:
                         result = await func(*args, **kwargs)
                         execution_time = time.time() - start_time
 
-                        # Parse result for enhanced logging
-                        result_data = _parse_tool_result(result, tool_name)
-
-                        # Log successful execution with enhanced metrics
+                        # Log successful execution
                         span.set_attributes({
                             'execution.success': True,
                             'execution.duration_seconds': execution_time,
                             'result.type': type(result).__name__,
-                            'result.size_bytes': len(str(result)),
-                            **result_data
                         })
 
-                        # Performance analysis
-                        expected_duration = _get_expected_duration(tool_name)
-                        if execution_time > expected_duration * 2:
-                            span.set_attribute('performance.slow_execution', True)
-                            logger.warning(f"MCP tool {tool_name} executed slower than expected",
-                                         execution_time=execution_time,
-                                         expected_duration=expected_duration,
-                                         performance_ratio=execution_time / expected_duration)
+                        # Log result summary if it's a dict
+                        if isinstance(result, dict):
+                            if 'success' in result:
+                                span.set_attribute('result.success', result['success'])
+                            if 'chunks_stored' in result:
+                                span.set_attribute('result.chunks_stored', result['chunks_stored'])
+                            if 'pages_crawled' in result:
+                                span.set_attribute('result.pages_crawled', result['pages_crawled'])
 
                         logger.info(f"MCP tool {tool_name} completed successfully",
-                                  execution_time=execution_time,
-                                  result_type=type(result).__name__,
-                                  result_summary=result_data)
+                                  execution_time=execution_time, result_type=type(result).__name__)
 
                         return result
 
                     except Exception as e:
                         execution_time = time.time() - start_time
 
-                        # Enhanced error logging
-                        error_context = _analyze_error_context(e, tool_name, safe_kwargs)
-
+                        # Log error
                         span.set_attributes({
                             'execution.success': False,
                             'execution.duration_seconds': execution_time,
                             'error.type': type(e).__name__,
                             'error.message': str(e),
-                            'error.category': error_context['category'],
-                            'error.severity': error_context['severity'],
-                            'error.recoverable': error_context['recoverable']
                         })
 
                         logger.error(f"MCP tool {tool_name} failed",
-                                   error=str(e),
-                                   error_type=type(e).__name__,
-                                   execution_time=execution_time,
-                                   error_context=error_context,
-                                   tool_parameters=safe_kwargs)
+                                   error=str(e), error_type=type(e).__name__,
+                                   execution_time=execution_time)
 
                         raise
             else:
-                # Enhanced fallback logging
+                # Fallback logging
                 try:
-                    logger.info(f"Executing MCP tool: {tool_name}", parameters=safe_kwargs)
+                    logger.info(f"Executing MCP tool: {tool_name}")
                     result = await func(*args, **kwargs)
                     execution_time = time.time() - start_time
-                    result_summary = _parse_tool_result(result, tool_name)
-                    logger.info(f"MCP tool {tool_name} completed in {execution_time:.2f}s",
-                              result_summary=result_summary)
+                    logger.info(f"MCP tool {tool_name} completed in {execution_time:.2f}s")
                     return result
                 except Exception as e:
                     execution_time = time.time() - start_time
-                    error_context = _analyze_error_context(e, tool_name, safe_kwargs)
-                    logger.error(f"MCP tool {tool_name} failed after {execution_time:.2f}s: {e}",
-                               error_context=error_context)
+                    logger.error(f"MCP tool {tool_name} failed after {execution_time:.2f}s: {e}")
                     raise
 
         return wrapper
     return decorator
 
 
-def _get_tool_category(tool_name: str) -> str:
-    """Categorize MCP tools for better organization."""
-    if tool_name in ['smart_crawl_url', 'crawl_single_page']:
-        return 'content_acquisition'
-    elif tool_name in ['perform_rag_query', 'search_code_examples']:
-        return 'content_search'
-    elif tool_name == 'get_available_sources':
-        return 'content_discovery'
-    else:
-        return 'utility'
 
-
-def _get_expected_duration(tool_name: str) -> float:
-    """Get expected duration for performance analysis."""
-    durations = {
-        'crawl_single_page': 5.0,
-        'smart_crawl_url': 15.0,
-        'get_available_sources': 0.5,
-        'perform_rag_query': 2.0,
-        'search_code_examples': 2.0
-    }
-    return durations.get(tool_name, 5.0)
-
-
-def _parse_tool_result(result: Any, tool_name: str) -> Dict[str, Any]:
-    """Parse tool result for enhanced logging."""
-    result_data = {}
-
-    try:
-        if isinstance(result, str):
-            import json
-            parsed = json.loads(result)
-            if isinstance(parsed, dict):
-                result_data['result.success'] = parsed.get('success', False)
-
-                # Tool-specific result parsing
-                if tool_name in ['smart_crawl_url', 'crawl_single_page']:
-                    result_data.update({
-                        'result.pages_crawled': parsed.get('pages_crawled', 0),
-                        'result.chunks_stored': parsed.get('chunks_stored', 0),
-                        'result.code_examples_stored': parsed.get('code_examples_stored', 0),
-                        'result.content_length': parsed.get('content_length', 0)
-                    })
-                elif tool_name in ['perform_rag_query', 'search_code_examples']:
-                    result_data.update({
-                        'result.matches_found': parsed.get('count', 0),
-                        'result.search_mode': parsed.get('search_mode', 'unknown'),
-                        'result.reranking_applied': parsed.get('reranking_applied', False)
-                    })
-                elif tool_name == 'get_available_sources':
-                    result_data.update({
-                        'result.sources_count': parsed.get('count', 0)
-                    })
-    except Exception:
-        # If parsing fails, just record basic info
-        result_data['result.parse_error'] = True
-
-    return result_data
-
-
-def _analyze_error_context(error: Exception, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-    """Analyze error context for better debugging."""
-    error_msg = str(error).lower()
-    error_type = type(error).__name__
-
-    # Categorize error
-    if 'network' in error_msg or 'connection' in error_msg or 'timeout' in error_msg:
-        category = 'network'
-        severity = 'medium'
-        recoverable = True
-    elif 'database' in error_msg or 'postgres' in error_msg or 'sql' in error_msg:
-        category = 'database'
-        severity = 'high'
-        recoverable = True
-    elif 'permission' in error_msg or 'access' in error_msg or 'forbidden' in error_msg:
-        category = 'permission'
-        severity = 'high'
-        recoverable = False
-    elif 'validation' in error_msg or 'invalid' in error_msg:
-        category = 'validation'
-        severity = 'low'
-        recoverable = False
-    else:
-        category = 'unknown'
-        severity = 'medium'
-        recoverable = True
-
-    return {
-        'category': category,
-        'severity': severity,
-        'recoverable': recoverable,
-        'error_type': error_type,
-        'tool_name': tool_name,
-        'has_url_param': 'url' in parameters,
-        'has_query_param': 'query' in parameters
-    }
 
 
 def log_agent_interaction(agent_type: str):
