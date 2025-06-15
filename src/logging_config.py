@@ -6,11 +6,9 @@ Pydantic AI agent interactions, following best practices for structured logging.
 """
 
 import os
-import sys
-from typing import Any, Dict, Optional
+from typing import Optional
 from functools import wraps
 import time
-import asyncio
 
 try:
     import logfire
@@ -78,8 +76,8 @@ logger = get_logger()
 
 def log_mcp_tool_execution(tool_name: str):
     """
-    Decorator for logging MCP tool execution with comprehensive metrics.
-    
+    Simple decorator for logging MCP tool execution with basic metrics.
+
     Args:
         tool_name: Name of the MCP tool being executed
     """
@@ -87,11 +85,11 @@ def log_mcp_tool_execution(tool_name: str):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             start_time = time.time()
-            
+
             # Extract parameters for logging (excluding sensitive data)
-            safe_kwargs = {k: v for k, v in kwargs.items() 
+            safe_kwargs = {k: v for k, v in kwargs.items()
                           if not any(sensitive in k.lower() for sensitive in ['token', 'key', 'password'])}
-            
+
             if LOGFIRE_AVAILABLE:
                 with logger.span(f"mcp_tool_{tool_name}") as span:
                     span.set_attributes({
@@ -100,18 +98,18 @@ def log_mcp_tool_execution(tool_name: str):
                         'tool.args_count': len(args),
                         'execution.start_time': start_time,
                     })
-                    
+
                     try:
                         result = await func(*args, **kwargs)
                         execution_time = time.time() - start_time
-                        
+
                         # Log successful execution
                         span.set_attributes({
                             'execution.success': True,
                             'execution.duration_seconds': execution_time,
                             'result.type': type(result).__name__,
                         })
-                        
+
                         # Log result summary if it's a dict
                         if isinstance(result, dict):
                             if 'success' in result:
@@ -120,15 +118,15 @@ def log_mcp_tool_execution(tool_name: str):
                                 span.set_attribute('result.chunks_stored', result['chunks_stored'])
                             if 'pages_crawled' in result:
                                 span.set_attribute('result.pages_crawled', result['pages_crawled'])
-                        
-                        logger.info(f"MCP tool {tool_name} completed successfully", 
+
+                        logger.info(f"MCP tool {tool_name} completed successfully",
                                   execution_time=execution_time, result_type=type(result).__name__)
-                        
+
                         return result
-                        
+
                     except Exception as e:
                         execution_time = time.time() - start_time
-                        
+
                         # Log error
                         span.set_attributes({
                             'execution.success': False,
@@ -136,11 +134,11 @@ def log_mcp_tool_execution(tool_name: str):
                             'error.type': type(e).__name__,
                             'error.message': str(e),
                         })
-                        
-                        logger.error(f"MCP tool {tool_name} failed", 
-                                   error=str(e), error_type=type(e).__name__, 
+
+                        logger.error(f"MCP tool {tool_name} failed",
+                                   error=str(e), error_type=type(e).__name__,
                                    execution_time=execution_time)
-                        
+
                         raise
             else:
                 # Fallback logging
@@ -154,9 +152,12 @@ def log_mcp_tool_execution(tool_name: str):
                     execution_time = time.time() - start_time
                     logger.error(f"MCP tool {tool_name} failed after {execution_time:.2f}s: {e}")
                     raise
-                    
+
         return wrapper
     return decorator
+
+
+
 
 
 def log_agent_interaction(agent_type: str):

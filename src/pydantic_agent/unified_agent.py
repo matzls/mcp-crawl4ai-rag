@@ -15,12 +15,48 @@ from dataclasses import dataclass
 # Import logfire for agent instrumentation
 try:
     import logfire
-    logfire.configure()
     LOGFIRE_AVAILABLE = True
 except ImportError:
     LOGFIRE_AVAILABLE = False
 
-from ..logging_config import log_agent_interaction, logger
+
+def setup_logfire_instrumentation():
+    """
+    Setup Pydantic AI's built-in Logfire instrumentation.
+
+    This function configures Logfire and enables automatic instrumentation
+    for Pydantic AI agents and HTTP requests (for viewing raw prompts/responses).
+    """
+    if not LOGFIRE_AVAILABLE:
+        print("Logfire not available, skipping instrumentation")
+        return False
+
+    try:
+        # Configure Logfire
+        logfire.configure()
+
+        # Enable Pydantic AI instrumentation
+        logfire.instrument_pydantic_ai()
+
+        # Enable HTTP instrumentation to see raw prompts/responses
+        logfire.instrument_httpx(capture_all=True)
+
+        print("✓ Logfire instrumentation configured successfully")
+        print(f"🔗 Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent")
+        return True
+
+    except Exception as e:
+        print(f"Warning: Failed to configure Logfire instrumentation: {e}")
+        return False
+
+try:
+    from logging_config import logger
+except ImportError:
+    # Fallback for when running from different contexts
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from logging_config import logger
 
 
 @dataclass
@@ -119,7 +155,7 @@ def create_unified_agent(server_url: str = "http://localhost:8051/sse") -> Agent
     # Build agent configuration
     agent_kwargs = {
         'model': 'openai:o3',
-        'deps_type': UnifiedAgentDependencies, 
+        'deps_type': UnifiedAgentDependencies,
         'output_type': UnifiedAgentResult,
         'mcp_servers': [server],
         'system_prompt': _build_intelligent_system_prompt()
@@ -266,34 +302,33 @@ Remember: You are not just a tool executor, but an intelligent assistant that un
 """
 
 
-@log_agent_interaction("unified")
 async def run_unified_agent(
     agent: Agent,
     user_query: str,
     dependencies: UnifiedAgentDependencies
 ) -> UnifiedAgentResult:
     """
-    Execute the unified agent with comprehensive logging and error handling.
-    
+    Execute the unified agent with standard Logfire observability.
+
     Args:
         agent: The configured unified agent
         user_query: User's query or request
         dependencies: Configuration dependencies
-        
+
     Returns:
         Comprehensive result with workflow execution details
     """
-    logger.info("Starting unified agent workflow", 
+    logger.info("Starting unified agent workflow",
                query_length=len(user_query),
                agent_type="unified_orchestrator")
-    
-    # Run agent with MCP server context
+
+    # Run agent with MCP server context - Pydantic AI's built-in instrumentation will handle tracing
     async with agent.run_mcp_servers():
         result = await agent.run(user_query, deps=dependencies)
-    
-    logger.info("Unified agent workflow completed", 
-               workflow_success=result.data.workflow_success,
-               steps_count=len(result.data.steps_executed),
-               total_time=result.data.total_execution_time_seconds)
-    
+
+    logger.info("Unified agent workflow completed",
+               workflow_success=getattr(result.data, 'workflow_success', True),
+               steps_count=len(getattr(result.data, 'steps_executed', [])),
+               total_time=getattr(result.data, 'total_execution_time_seconds', 0))
+
     return result.data

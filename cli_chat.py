@@ -37,9 +37,10 @@ except ImportError:
     print("Rich not available, using basic CLI interface")
 
 from pydantic_agent.unified_agent import (
-    create_unified_agent, 
-    run_unified_agent, 
-    UnifiedAgentDependencies
+    create_unified_agent,
+    run_unified_agent,
+    UnifiedAgentDependencies,
+    setup_logfire_instrumentation
 )
 from logging_config import logger
 
@@ -358,21 +359,30 @@ I intelligently choose from 5 specialized tools based on your needs:
 
 async def main():
     """Main entry point."""
+    # Setup Logfire instrumentation first
+    logfire_enabled = setup_logfire_instrumentation()
+
     # Check if MCP server is likely running
     if RICH_AVAILABLE:
         console = Console()
         console.print("🚀 Starting Crawl4AI CLI Chat Interface", style="bold green")
+        if logfire_enabled:
+            console.print("📊 Logfire observability enabled", style="green")
+            console.print("🔗 Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent", style="blue")
     else:
         print("🚀 Starting Crawl4AI CLI Chat Interface")
-    
+        if logfire_enabled:
+            print("📊 Logfire observability enabled")
+            print("🔗 Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent")
+
     # Basic checks
     if not os.getenv("OPENAI_API_KEY"):
         print("⚠️  Warning: OPENAI_API_KEY not found in environment")
         print("   Please set it with: export OPENAI_API_KEY=your_key_here")
-    
+
     print("💡 Make sure the MCP server is running: ./start_mcp_server.sh")
     print()
-    
+
     # Run chat interface
     chat = ChatInterface()
     return await chat.run()
