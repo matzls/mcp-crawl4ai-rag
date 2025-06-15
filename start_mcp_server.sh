@@ -25,7 +25,10 @@ source "$VENV_PATH/bin/activate"
 
 # Load environment variables
 if [ -f "$PROJECT_ROOT/.env" ]; then
-    export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
+    # More robust env loading that handles comments and special characters
+    set -a  # automatically export all variables
+    source "$PROJECT_ROOT/.env"
+    set +a  # stop automatically exporting
 fi
 
 # Set default transport (SSE is default for better performance)
