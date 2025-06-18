@@ -105,3 +105,8 @@ ERROR:    Exception in ASGI application
     |     await connected
     | asyncpg.exceptions.InvalidAuthorizationSpecificationError: role "$(whoami)" does not exist
     +------------------------------------
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [35589]
+./start_mcp_server.sh: line 49: 35589 Terminated: 15          TRANSPORT=sse python src/crawl4ai_mcp.py

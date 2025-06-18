@@ -51,20 +51,23 @@ async def create_postgres_pool() -> asyncpg.Pool:
     Returns:
         PostgreSQL connection pool
     """
+    import getpass
+    
     database_url = os.getenv("DATABASE_URL")
     
     if database_url:
+        # Expand $(whoami) if present in DATABASE_URL
+        if "$(whoami)" in database_url:
+            current_user = getpass.getuser()
+            database_url = database_url.replace("$(whoami)", current_user)
         return await asyncpg.create_pool(database_url, min_size=2, max_size=10)
     
     # Fallback to individual components
     host = os.getenv("POSTGRES_HOST", "localhost")
     port = os.getenv("POSTGRES_PORT", "5432")
     database = os.getenv("POSTGRES_DB", "crawl4ai_rag")
-    user = os.getenv("POSTGRES_USER", "postgres")
-    password = os.getenv("POSTGRES_PASSWORD")
-    
-    if not password:
-        raise ValueError("Either DATABASE_URL or POSTGRES_PASSWORD must be set in environment variables")
+    user = os.getenv("POSTGRES_USER", getpass.getuser())  # Default to current user
+    password = os.getenv("POSTGRES_PASSWORD")  # None is acceptable for trust auth
     
     return await asyncpg.create_pool(
         host=host,

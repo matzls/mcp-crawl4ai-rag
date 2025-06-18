@@ -67,7 +67,8 @@ async def test_all_mcp_tools():
                 # List available tools first
                 print("\n📋 Listing available tools...")
                 try:
-                    tools = await session.list_tools()
+                    tools_result = await session.list_tools()
+                    tools = tools_result.tools if hasattr(tools_result, 'tools') else tools_result
                     print(f"✅ Found {len(tools)} tools:")
                     for tool in tools:
                         print(f"  • {tool.name}: {tool.description}")
