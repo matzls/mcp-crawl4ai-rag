@@ -48,7 +48,7 @@
 git status && git log --oneline -5
 
 # Quick server verification
-./start_mcp_server.sh && curl -X POST "http://localhost:8051/tools/get_available_sources"
+./start_mcp_server.sh && echo "MCP server started - use MCP Inspector at http://localhost:8051/sse for tool testing"
 
 # Database health check
 psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"
@@ -71,13 +71,13 @@ psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_
 
 ### Core Technology Stack
 - **Language:** Python 3.12+ with UV package manager
-- **MCP Framework:** FastMCP for Model Context Protocol server implementation
+- **MCP Framework:** Official MCP Python SDK (mcp>=1.9.4) for Model Context Protocol server implementation
 - **Web Crawling:** Crawl4AI with AsyncWebCrawler for intelligent content extraction
 - **Database:** PostgreSQL 17 + pgvector extension for vector storage and semantic search
 - **AI/ML:** OpenAI API (text-embedding-3-small, GPT-4.1) for embeddings and LLM processing
 - **Agent Framework:** Pydantic AI for intelligent agent orchestration with MCP integration
 - **Observability:** Logfire for comprehensive logging and performance monitoring
-- **Key Dependencies:** crawl4ai, mcp, asyncpg, openai, sentence-transformers, pydantic-ai[logfire]
+- **Key Dependencies:** crawl4ai, mcp>=1.9.4, asyncpg, openai, sentence-transformers, pydantic-ai[logfire]
 
 <project_architecture>
 ## Project Architecture
@@ -88,9 +88,9 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 ### Key Components
 
 #### Core MCP Server (`src/crawl4ai_mcp.py`)
-- **FastMCP Server**: Main server implementing MCP protocol with SSE/stdio transport
-- **Lifespan Management**: Handles AsyncWebCrawler and PostgreSQL pool initialization
-- **MCP Tools**: Implements 5 core tools for crawling and searching content
+- **Official MCP Server**: Main server implementing MCP protocol using official Python SDK with SSE/stdio transport
+- **Lifespan Management**: Handles AsyncWebCrawler and PostgreSQL pool initialization via asynccontextmanager
+- **MCP Tools**: Implements 5 core tools for crawling and searching content using @mcp.tool() decorators
 
 #### Crawl4AI Integration (Web Content Acquisition Layer)
 - **Role**: Purely handles web crawling and content extraction
@@ -116,9 +116,10 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 ### Architecture Decisions
 
 #### MCP Protocol Implementation
-- Uses FastMCP framework for clean tool-based architecture
-- Implements both SSE (HTTP) and stdio transports for flexibility
-- Context management pattern for sharing crawler and database connections
+- Uses official MCP Python SDK for standards-compliant MCP server implementation
+- Implements MCP protocol over SSE and stdio transports (NOT REST/HTTP endpoints)
+- MCP tools accessible via MCP protocol clients (Claude Desktop, MCP Inspector, custom MCP clients)
+- Context management pattern for sharing crawler and database connections via lifespan_context
 
 #### Advanced RAG Strategies (Configurable)
 - **Contextual Embeddings**: Enhances chunks with document context for better retrieval
@@ -502,7 +503,7 @@ python -c "from src.utils import create_postgres_pool; import asyncio; asyncio.r
 ```bash
 # Quick health check (run this first in any session)
 git status && git log --oneline -5
-./start_mcp_server.sh && curl -X POST "http://localhost:8051/tools/get_available_sources"
+./start_mcp_server.sh  # Check server starts successfully
 psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"
 
 # Development cycle
@@ -523,6 +524,19 @@ TRANSPORT=stdio ./start_mcp_server.sh
 # Connect MCP Inspector for debugging
 npx @modelcontextprotocol/inspector
 # Connect to: http://localhost:8051/sse
+```
+
+**MCP Tools Testing**
+```bash
+# Test MCP tools via MCP Inspector (recommended)
+# 1. Start server: ./start_mcp_server.sh
+# 2. Open MCP Inspector: npx @modelcontextprotocol/inspector  
+# 3. Connect to: http://localhost:8051/sse
+# 4. Test tools: get_available_sources, perform_rag_query, smart_crawl_url, etc.
+
+# Test via Pydantic AI agents (integration testing)
+python src/pydantic_agent/examples/unified_agent_example.py
+python cli_chat.py  # Interactive CLI with natural language
 ```
 
 **Quality Assurance Workflows**
@@ -556,7 +570,7 @@ python cli_chat.py
 **Development & Debugging Tools**
 ```bash
 # System health checks
-curl -X POST "http://localhost:8051/tools/get_available_sources"  # MCP server
+# Use MCP Inspector at http://localhost:8051/sse to test MCP tools
 psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"  # Database
 
 # Interactive development
@@ -601,9 +615,9 @@ locust -f tests/load_test.py --host=http://localhost:8051
 
 ### MCP Tools Implementation Standards
 **Core Patterns (Enforced)**
-- **All tools are async** - use `async def` with `@mcp.tool()` decorator
-- **Context Access** - get lifespan context via `ctx.request_context.lifespan_context`
-- **Error Handling** - return structured JSON with success/error fields, never raise exceptions
+- **All tools are async** - use `async def` with `@mcp.tool()` decorator from official MCP Python SDK
+- **Context Access** - get lifespan context via `ctx.request_context.lifespan_context` (official MCP SDK pattern)
+- **Error Handling** - return structured JSON responses; may raise exceptions as MCP SDK handles them
 - **Type Safety** - complete type hints for all parameters and return values
 - **Logging Integration** - use `@log_mcp_tool_execution` decorator for observability
 
@@ -624,7 +638,7 @@ locust -f tests/load_test.py --host=http://localhost:8051
 
 **Framework Verification Requirements**
 - **Pydantic AI**: Verify agent patterns, dependency injection, MCP integration
-- **FastMCP**: Check tool registration, context management, transport protocols
+- **Official MCP Python SDK**: Check tool registration (@mcp.tool), context management, transport protocols (SSE/stdio)
 - **Crawl4AI**: Validate crawling strategies, content extraction, parallel processing
 - **PostgreSQL/pgvector**: Confirm vector operations, indexing, query optimization
 
