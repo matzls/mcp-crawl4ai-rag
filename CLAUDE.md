@@ -278,7 +278,12 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 
 ### 🔴 Critical Priority (Blocking/High Risk)
 **Active Tasks - Immediate Action Required**
-- *No critical blocking tasks currently active*
+- [ ] **TASK-036**: Test all 5 MCP tools individually via CLI and verify responses
+  - **Phase**: Quality assurance
+  - **Risk**: Critical - blocks production readiness
+- [ ] **TASK-041**: Investigate and fix MCP server SSE connection stability issues
+  - **Phase**: Infrastructure stability
+  - **Risk**: Critical - affects all agent operations
 
 ### 🟡 Important Priority (Medium Risk)
 **MAKE IT RIGHT Phase Tasks**
@@ -291,9 +296,12 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 - [ ] **TASK-028**: Enhanced configuration management for RAG strategies
   - **Phase**: Code standardization
   - **Risk**: Maintenance complexity
-- [ ] **TASK-031**: Investigate and resolve agent testing runtime errors
-  - **Phase**: Quality assurance
-  - **Risk**: Testing reliability issues
+- [ ] **TASK-038**: Set up formal pytest testing framework with proper structure
+  - **Phase**: Testing infrastructure
+  - **Risk**: Quality assurance foundation
+- [ ] **TASK-039**: Write comprehensive test suites for MCP tools and agent orchestration
+  - **Phase**: Testing implementation
+  - **Risk**: Coverage and reliability
 
 ### 🟢 Nice-to-Have Priority (Low Risk)
 **MAKE IT FAST Phase Tasks (Future)**
@@ -306,6 +314,10 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 
 ### ✅ Recently Completed (MAKE IT WORK → MAKE IT RIGHT Transition)
 **Phase 2 Progress (Jan 2025)**
+- [x] **TASK-040**: Fix logging compatibility issues across all agent examples and CLI interface (2025-01-18)
+- [x] **TASK-037**: Investigate TASK-031 agent runtime errors through systematic testing (2025-01-18)
+- [x] **TASK-035**: Execute manual verification tests for MCP server, CLI, and database connectivity (2025-01-18)
+- [x] **TASK-031**: Investigate and resolve agent testing runtime errors (2025-01-18)
 - [x] **TASK-033**: Comprehensive codebase analysis vs CLAUDE.md documentation verification (2025-01-15)
 - [x] **TASK-034**: Unified migration of all agent implementations from GPT-4 Turbo to OpenAI o3 (2025-01-15)
 - [x] **TASK-024**: Complete unified agent architecture implementation with GPT-4.1 integration and import fixes (2025-01-15)
@@ -486,6 +498,20 @@ psql -h localhost -U $(whoami) -d crawl4ai_rag -f crawled_pages.sql
 python -c "from src.utils import create_postgres_pool; import asyncio; asyncio.run(create_postgres_pool())"
 ```
 
+**Common Development Tasks**
+```bash
+# Quick health check (run this first in any session)
+git status && git log --oneline -5
+./start_mcp_server.sh && curl -X POST "http://localhost:8051/tools/get_available_sources"
+psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"
+
+# Development cycle
+ruff format src/ tests/        # Format code
+ruff check src/ tests/         # Lint code  
+mypy src/                      # Type check
+pytest tests/ -v               # Run tests
+```
+
 **Development Server Management**
 ```bash
 # Start MCP server (SSE transport - default)
@@ -559,6 +585,13 @@ locust -f tests/load_test.py --host=http://localhost:8051
 - **Only use approved libraries** or discuss new dependencies with user
 - **Never delete existing code** without explicit instruction and backup
 - **Phase-aware development** - align all work with current MAKE IT RIGHT phase
+
+### Session Startup Protocol (Required)
+**Every development session MUST start with:**
+1. **Read Current Tasks** - Check 🔴🟡🟢 priorities in Task Management section
+2. **Git Status Check** - Run `git status && git log --oneline -5`
+3. **System Health** - Verify MCP server, database, and environment
+4. **Phase Verification** - Confirm current development phase requirements
 
 ### Git Integration Requirements (Non-negotiable)
 - **Commit after every completed task** using conventional commit format
