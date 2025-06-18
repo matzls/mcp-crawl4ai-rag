@@ -73,6 +73,41 @@ def get_logger():
 # Global logger instance
 logger = get_logger()
 
+# Helper functions for compatibility between logfire and standard logging
+def is_logfire_logger(logger_instance) -> bool:
+    """Check if logger instance supports logfire structured logging."""
+    return LOGFIRE_AVAILABLE and hasattr(logger_instance, 'span') and hasattr(logger_instance, 'info')
+
+def log_info(message: str, **kwargs):
+    """Log info message with compatibility for both logfire and standard logging."""
+    if is_logfire_logger(logger):
+        logger.info(message, **kwargs)
+    else:
+        # Format structured data for standard logging
+        extra_info = ", ".join(f"{k}={v}" for k, v in kwargs.items() if v is not None)
+        full_message = f"{message}" + (f" ({extra_info})" if extra_info else "")
+        logger.info(full_message)
+
+def log_error(message: str, **kwargs):
+    """Log error message with compatibility for both logfire and standard logging."""
+    if is_logfire_logger(logger):
+        logger.error(message, **kwargs)
+    else:
+        # Format structured data for standard logging
+        extra_info = ", ".join(f"{k}={v}" for k, v in kwargs.items() if v is not None)
+        full_message = f"{message}" + (f" ({extra_info})" if extra_info else "")
+        logger.error(full_message)
+
+def log_warning(message: str, **kwargs):
+    """Log warning message with compatibility for both logfire and standard logging."""
+    if is_logfire_logger(logger):
+        logger.warning(message, **kwargs)
+    else:
+        # Format structured data for standard logging
+        extra_info = ", ".join(f"{k}={v}" for k, v in kwargs.items() if v is not None)
+        full_message = f"{message}" + (f" ({extra_info})" if extra_info else "")
+        logger.warning(full_message)
+
 
 def log_mcp_tool_execution(tool_name: str):
     """
@@ -90,7 +125,7 @@ def log_mcp_tool_execution(tool_name: str):
             safe_kwargs = {k: v for k, v in kwargs.items()
                           if not any(sensitive in k.lower() for sensitive in ['token', 'key', 'password'])}
 
-            if LOGFIRE_AVAILABLE:
+            if is_logfire_logger(logger):
                 with logger.span(f"mcp_tool_{tool_name}") as span:
                     span.set_attributes({
                         'tool.name': tool_name,
@@ -119,8 +154,8 @@ def log_mcp_tool_execution(tool_name: str):
                             if 'pages_crawled' in result:
                                 span.set_attribute('result.pages_crawled', result['pages_crawled'])
 
-                        logger.info(f"MCP tool {tool_name} completed successfully",
-                                  execution_time=execution_time, result_type=type(result).__name__)
+                        log_info(f"MCP tool {tool_name} completed successfully",
+                                execution_time=execution_time, result_type=type(result).__name__)
 
                         return result
 
@@ -135,9 +170,9 @@ def log_mcp_tool_execution(tool_name: str):
                             'error.message': str(e),
                         })
 
-                        logger.error(f"MCP tool {tool_name} failed",
-                                   error=str(e), error_type=type(e).__name__,
-                                   execution_time=execution_time)
+                        log_error(f"MCP tool {tool_name} failed",
+                                 error=str(e), error_type=type(e).__name__,
+                                 execution_time=execution_time)
 
                         raise
             else:
@@ -176,7 +211,7 @@ def log_agent_interaction(agent_type: str):
             prompt = kwargs.get('prompt', args[1] if len(args) > 1 else 'Unknown')
             prompt_preview = prompt[:100] + "..." if len(str(prompt)) > 100 else str(prompt)
             
-            if LOGFIRE_AVAILABLE:
+            if is_logfire_logger(logger):
                 with logger.span(f"agent_{agent_type}_interaction") as span:
                     span.set_attributes({
                         'agent.type': agent_type,
@@ -204,10 +239,10 @@ def log_agent_interaction(agent_type: str):
                             **{f'result.{k}': v for k, v in result_summary.items()}
                         })
                         
-                        logger.info(f"Agent {agent_type} interaction completed", 
-                                  execution_time=execution_time, 
-                                  prompt_length=len(str(prompt)),
-                                  result_type=type(result).__name__)
+                        log_info(f"Agent {agent_type} interaction completed", 
+                                execution_time=execution_time, 
+                                prompt_length=len(str(prompt)),
+                                result_type=type(result).__name__)
                         
                         return result
                         
@@ -221,9 +256,9 @@ def log_agent_interaction(agent_type: str):
                             'error.message': str(e),
                         })
                         
-                        logger.error(f"Agent {agent_type} interaction failed", 
-                                   error=str(e), error_type=type(e).__name__,
-                                   execution_time=execution_time)
+                        log_error(f"Agent {agent_type} interaction failed", 
+                                 error=str(e), error_type=type(e).__name__,
+                                 execution_time=execution_time)
                         
                         raise
             else:
@@ -255,7 +290,7 @@ def log_database_operation(operation: str):
         async def wrapper(*args, **kwargs):
             start_time = time.time()
             
-            if LOGFIRE_AVAILABLE:
+            if is_logfire_logger(logger):
                 with logger.span(f"db_{operation}") as span:
                     span.set_attributes({
                         'db.operation': operation,
@@ -275,8 +310,8 @@ def log_database_operation(operation: str):
                             'db.result_count': result_count,
                         })
                         
-                        logger.info(f"Database {operation} completed", 
-                                  execution_time=execution_time, result_count=result_count)
+                        log_info(f"Database {operation} completed", 
+                                execution_time=execution_time, result_count=result_count)
                         
                         return result
                         
@@ -290,8 +325,8 @@ def log_database_operation(operation: str):
                             'db.error.message': str(e),
                         })
                         
-                        logger.error(f"Database {operation} failed", 
-                                   error=str(e), execution_time=execution_time)
+                        log_error(f"Database {operation} failed", 
+                                 error=str(e), execution_time=execution_time)
                         
                         raise
             else:
@@ -319,11 +354,7 @@ def log_crawling_operation(url: str, operation_type: str):
         url: URL being crawled
         operation_type: Type of crawling operation
     """
-    if LOGFIRE_AVAILABLE:
-        logger.info("Crawling operation started", 
-                   url=url, operation_type=operation_type)
-    else:
-        logger.info(f"Crawling {operation_type}: {url}")
+    log_info("Crawling operation started", url=url, operation_type=operation_type)
 
 
 def log_rag_query(query: str, match_count: int, source: Optional[str] = None):
@@ -335,12 +366,9 @@ def log_rag_query(query: str, match_count: int, source: Optional[str] = None):
         match_count: Number of matches requested
         source: Optional source filter
     """
-    if LOGFIRE_AVAILABLE:
-        logger.info("RAG query executed", 
-                   query_preview=query[:100], query_length=len(query),
-                   match_count=match_count, source=source)
-    else:
-        logger.info(f"RAG query: {query[:100]}... (count: {match_count}, source: {source})")
+    log_info("RAG query executed", 
+             query_preview=query[:100], query_length=len(query),
+             match_count=match_count, source=source)
 
 
 def log_system_startup(service_name: str, version: str):
@@ -351,9 +379,6 @@ def log_system_startup(service_name: str, version: str):
         service_name: Name of the service starting up
         version: Version of the service
     """
-    if LOGFIRE_AVAILABLE:
-        logger.info("System startup", 
-                   service=service_name, version=version, 
-                   environment=os.getenv('ENVIRONMENT', 'development'))
-    else:
-        logger.info(f"Starting {service_name} v{version}")
+    log_info("System startup", 
+             service=service_name, version=version, 
+             environment=os.getenv('ENVIRONMENT', 'development'))

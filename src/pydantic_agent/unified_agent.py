@@ -50,13 +50,13 @@ def setup_logfire_instrumentation():
         return False
 
 try:
-    from logging_config import logger
+    from logging_config import log_info, log_error
 except ImportError:
     # Fallback for when running from different contexts
     import sys
     from pathlib import Path
     sys.path.append(str(Path(__file__).parent.parent))
-    from logging_config import logger
+    from logging_config import log_info, log_error
 
 
 @dataclass
@@ -318,17 +318,17 @@ async def run_unified_agent(
     Returns:
         Comprehensive result with workflow execution details
     """
-    logger.info("Starting unified agent workflow",
-               query_length=len(user_query),
-               agent_type="unified_orchestrator")
+    log_info("Starting unified agent workflow",
+             query_length=len(user_query),
+             agent_type="unified_orchestrator")
 
     # Run agent with MCP server context - Pydantic AI's built-in instrumentation will handle tracing
     async with agent.run_mcp_servers():
         result = await agent.run(user_query, deps=dependencies)
 
-    logger.info("Unified agent workflow completed",
-               workflow_success=getattr(result.data, 'workflow_success', True),
-               steps_count=len(getattr(result.data, 'steps_executed', [])),
-               total_time=getattr(result.data, 'total_execution_time_seconds', 0))
+    log_info("Unified agent workflow completed",
+             workflow_success=getattr(result.data, 'workflow_success', True),
+             steps_count=len(getattr(result.data, 'steps_executed', [])),
+             total_time=getattr(result.data, 'total_execution_time_seconds', 0))
 
     return result.data

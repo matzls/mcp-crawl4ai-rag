@@ -24,7 +24,7 @@ from pydantic_agent.unified_agent import (
     run_unified_agent,
     UnifiedAgentDependencies
 )
-from logging_config import logger
+from logging_config import log_info, log_error
 
 
 async def demonstrate_intelligent_orchestration():
@@ -83,7 +83,7 @@ async def demonstrate_intelligent_orchestration():
             print()
             
             try:
-                logger.info(f"Starting scenario {i}", scenario_name=scenario['name'])
+                log_info(f"Starting scenario {i}", scenario_name=scenario['name'])
                 
                 # Run the unified agent
                 result = await run_unified_agent(agent, scenario['query'], deps)
@@ -136,7 +136,7 @@ async def demonstrate_intelligent_orchestration():
                 
             except Exception as e:
                 print(f"❌ Scenario {i} failed: {e}")
-                logger.error(f"Scenario {i} error", error=str(e), scenario=scenario['name'])
+                log_error(f"Scenario {i} error", error=str(e), scenario=scenario['name'])
                 continue
         
         print("\n🎉 Unified agent demonstration completed!")
@@ -224,7 +224,7 @@ async def main():
         
     except Exception as e:
         print(f"❌ Demonstration failed: {e}")
-        logger.error("Demo failed", error=str(e), error_type=type(e).__name__)
+        log_error("Demo failed", error=str(e), error_type=type(e).__name__)
         return 1
 
 

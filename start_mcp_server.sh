@@ -45,5 +45,5 @@ if [ "$TRANSPORT" = "sse" ]; then
 else
     echo "📡 Stdio server starting"
     echo "📋 Connect MCP Inspector with: npx @modelcontextprotocol/inspector $VENV_PATH/bin/python src/crawl4ai_mcp.py"
-    python src/crawl4ai_mcp.py
+    python3 src/crawl4ai_mcp.py
 fi
