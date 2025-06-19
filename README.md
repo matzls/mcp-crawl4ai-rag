@@ -128,77 +128,72 @@ The typical workflow combines multiple tools:
 3. **Search content**: Use `perform_rag_query` for general content or `search_code_examples` for code-specific queries
 4. **Iterate**: Refine searches with source filtering based on discovered sources
 
-## Pydantic AI Agents
+## Pydantic AI Unified Agent
 
-The project includes intelligent agents that connect to the MCP server as clients, providing higher-level orchestration capabilities:
+The project includes a unified intelligent agent that connects to the MCP server as a client, providing intelligent orchestration of all MCP tools:
 
 > **✅ Production Ready**: Comprehensive testing completed with verified agent-to-MCP communication, structured workflows, and robust error handling. Performance tested with 197 pages crawled in 42.5 seconds, 856 content chunks stored successfully.
 
-### Agent Types
+### Unified Agent Architecture
 
-#### `create_crawl_agent(server_url: str = "http://localhost:8051/sse")`
-Specialized agent for web crawling operations with intelligent strategy selection.
+#### Single Intelligent Orchestrator  
+The system uses **one agent that intelligently selects from 5 MCP tools** based on user intent and workflow patterns.
+
+**Design Philosophy:**
+- **Intent-Driven Tool Selection**: Agent analyzes user queries to determine optimal workflow patterns
+- **Workflow Orchestration**: Automated multi-step processes with context management  
+- **Enhanced User Experience**: No agent selection needed - natural language interaction
+
+#### Tool Selection Logic
+**Research Workflow** (URLs mentioned):
+1. `smart_crawl_url` → Gather new content
+2. `get_available_sources` → Confirm storage  
+3. `perform_rag_query` → Answer questions about crawled content
+
+**Search Workflow** (questions about topics):
+1. `get_available_sources` → Check available content
+2. `perform_rag_query` → Find relevant information
+3. `search_code_examples` → If code specifically requested
+
+**Discovery Workflow** (content exploration):
+1. `get_available_sources` → List what's available
+2. Optional follow-up searches based on user interest
+
+### Usage Example
 
 ```python
-from pydantic_agent import create_crawl_agent, CrawlDependencies
+from pydantic_agent.unified_agent import create_unified_agent
 
-# Create crawling agent
-agent = create_crawl_agent()
-dependencies = CrawlDependencies()
+# Create unified agent (uses OpenAI o3 model)
+agent = create_unified_agent("http://localhost:8051/sse")
 
-# Run intelligent crawling workflow
+# Single agent handles all workflows intelligently
 async with agent.run_mcp_servers():
+    # Research workflow - automatically detects URL and crawls
     result = await agent.run(
-        "Crawl the Python documentation and extract all tutorial content",
-        deps=dependencies
+        "Crawl the Python documentation tutorial and then find examples of async/await patterns"
     )
-```
-
-#### `create_rag_agent(server_url: str = "http://localhost:8051/sse")`
-Focused on content retrieval and semantic search operations.
-
-```python
-from pydantic_agent import create_rag_agent, RAGDependencies
-
-# Create RAG agent
-agent = create_rag_agent()
-dependencies = RAGDependencies()
-
-# Run intelligent search workflow
-async with agent.run_mcp_servers():
+    
+    # Search workflow - automatically searches existing content  
     result = await agent.run(
-        "Find information about Python async/await patterns and provide examples",
-        deps=dependencies
+        "Find information about FastAPI dependency injection"
     )
-```
-
-#### `create_workflow_agent(server_url: str = "http://localhost:8051/sse")`
-Orchestrates complex multi-step operations combining crawling and RAG.
-
-```python
-from pydantic_agent import create_workflow_agent, WorkflowDependencies
-
-# Create workflow agent
-agent = create_workflow_agent()
-dependencies = WorkflowDependencies()
-
-# Run complex multi-step workflow
-async with agent.run_mcp_servers():
+    
+    # Code-focused workflow - automatically uses code search when appropriate
     result = await agent.run(
-        "Research FastAPI documentation, extract key concepts, and create a knowledge base for API development questions",
-        deps=dependencies
+        "Show me code examples for FastAPI route handlers"
     )
 ```
 
 ### Agent Features
 
-- **✅ Structured Outputs**: All agents return validated Pydantic models (CrawlResult, RAGResult, WorkflowResult) - **Tested and verified**
-- **✅ Type-Safe Dependencies**: Configuration through typed dependency injection - **Production ready**
-- **✅ Tool Registration**: Uses `@agent.tool` decorators with `RunContext` for dependency access - **Fully functional**
-- **✅ MCP Integration**: Follows documented patterns with `MCPServerSSE` and `agent.run_mcp_servers()` - **Verified working**
+- **✅ Unified Architecture**: Single agent intelligently orchestrates all 5 MCP tools - **Production ready**
+- **✅ OpenAI o3 Model**: Enhanced reasoning capabilities for complex tool selection - **Fully integrated**
+- **✅ Intent Analysis**: Automatically determines optimal workflow patterns from natural language - **Tested and verified**
+- **✅ MCP Integration**: Uses official MCP Python SDK with proper transport handling - **Verified working**
 - **✅ Error Handling**: Graceful error handling with informative error messages - **Robust and tested**
 - **✅ Performance**: Tested with large-scale operations (197 pages, 856 chunks) - **Production validated**
-- **✅ Logfire Observability**: Standard Pydantic AI instrumentation with real-time tracing - **Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent**
+- **✅ Logfire Observability**: Built-in Pydantic AI instrumentation with real-time tracing - **Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent**
 
 ### Testing Results
 
@@ -274,20 +269,29 @@ The Pydantic AI agent implementation has undergone comprehensive testing with ex
 ```
 mcp-crawl4ai-rag/
 ├── src/
-│   ├── crawl4ai_mcp.py          # Main MCP server implementation
+│   ├── crawl4ai_mcp.py          # Main MCP server implementation (official MCP SDK)
 │   ├── utils.py                 # Database and RAG utilities
-│   └── pydantic_agent/          # Intelligent agent layer
+│   ├── logging_config.py        # Logfire observability configuration
+│   └── pydantic_agent/          # Unified agent layer
 │       ├── __init__.py          # Agent exports
-│       ├── agent.py             # Agent factory functions and MCP integration
+│       ├── unified_agent.py     # Single orchestrator agent (OpenAI o3)
+│       ├── agent.py             # Legacy agent functions (deprecated)
 │       ├── dependencies.py     # Type-safe dependency injection models
 │       ├── outputs.py           # Structured output validation models
 │       ├── tools.py             # Agent tool implementations
 │       └── examples/            # Usage examples and workflows
+│           ├── unified_agent_example.py     # Main example
 │           ├── basic_crawl_example.py
 │           └── rag_workflow_example.py
+├── tests/                       # Testing infrastructure
+│   ├── __init__.py             # Test package initialization
+│   ├── test_mcp_tools.py       # Comprehensive MCP tool testing
+│   └── test_logging.py         # Logging verification tests
 ├── crawled_pages.sql            # PostgreSQL schema
-├── pyproject.toml               # Project dependencies
+├── pyproject.toml               # Project dependencies + dev dependencies  
+├── pytest.ini                  # Pytest configuration
 ├── .env                         # Environment configuration
+├── cli_chat.py                  # Interactive CLI interface
 └── start_mcp_server.sh          # Optimized startup script
 ```
 
@@ -351,8 +355,8 @@ OPENAI_API_KEY=your_openai_api_key
 # Logfire Observability (Optional)
 LOGFIRE_TOKEN=your_logfire_token
 
-# LLM for summaries and contextual embeddings
-MODEL_CHOICE=gpt-4o-mini
+# LLM for summaries and contextual embeddings  
+MODEL_CHOICE=gpt-o3
 
 # RAG Strategies (set to "true" or "false", default to "false")
 USE_CONTEXTUAL_EMBEDDINGS=false
@@ -488,29 +492,22 @@ Once the MCP server is running, you can use the Pydantic AI agents for intellige
 
 ```python
 import asyncio
-from pydantic_agent import create_crawl_agent, create_rag_agent, CrawlDependencies, RAGDependencies
+from pydantic_agent.unified_agent import create_unified_agent
 
 async def main():
-    # Create agents
-    crawl_agent = create_crawl_agent("http://localhost:8051/sse")
-    rag_agent = create_rag_agent("http://localhost:8051/sse")
+    # Create unified agent (handles all workflows)
+    agent = create_unified_agent("http://localhost:8051/sse")
 
-    # Set up dependencies
-    crawl_deps = CrawlDependencies()
-    rag_deps = RAGDependencies()
-
-    # Crawl content
-    async with crawl_agent.run_mcp_servers():
-        crawl_result = await crawl_agent.run(
-            "Crawl https://docs.python.org/3/tutorial/ and index all tutorial content",
-            deps=crawl_deps
+    # Single agent handles crawling and searching intelligently
+    async with agent.run_mcp_servers():
+        # Crawl and index content automatically
+        crawl_result = await agent.run(
+            "Crawl https://docs.python.org/3/tutorial/ and index all tutorial content"
         )
-
-    # Search content
-    async with rag_agent.run_mcp_servers():
-        search_result = await rag_agent.run(
-            "Find information about Python functions and provide examples",
-            deps=rag_deps
+        
+        # Search content with automatic tool selection
+        search_result = await agent.run(
+            "Find information about Python functions and provide examples"
         )
 
     print(f"Crawled: {crawl_result.data}")
@@ -523,11 +520,11 @@ asyncio.run(main())
 ### Advanced Workflow Example
 
 ```python
-from pydantic_agent import create_workflow_agent, WorkflowDependencies
+from pydantic_agent.unified_agent import create_unified_agent
 
 async def research_workflow():
-    agent = create_workflow_agent()
-    deps = WorkflowDependencies()
+    # Single agent orchestrates complex multi-step workflows
+    agent = create_unified_agent()
 
     async with agent.run_mcp_servers():
         result = await agent.run(
@@ -537,8 +534,7 @@ async def research_workflow():
             2. Extract key concepts about dependency injection
             3. Find code examples for async endpoints
             4. Create a summary of best practices
-            """,
-            deps=deps
+            """
         )
 
     return result
@@ -646,6 +642,18 @@ psql -d crawl4ai_rag -c "SELECT 1;"
 ### Testing Your Setup
 
 ```bash
+# Install testing dependencies
+uv pip install -e ".[dev]"
+
+# Run comprehensive test suite
+pytest tests/ -v --cov=src --cov-report=html
+
+# Test MCP tools individually  
+pytest tests/test_mcp_tools.py -v
+
+# Test logging configuration
+pytest tests/test_logging.py -v
+
 # Test MCP Inspector connection
 npx @modelcontextprotocol/inspector
 # Connect to: http://localhost:8051/sse
@@ -667,41 +675,50 @@ To build your own MCP server:
 3. Modify the `utils.py` file for any helper functions you need
 4. Extend the crawling capabilities by adding more specialized crawlers
 
-### Creating Custom Agents
+### Creating Custom Unified Agents
 
-To build your own Pydantic AI agents:
+To build your own unified Pydantic AI agents:
 
-1. **Create Agent Factory Functions**:
+1. **Create Unified Agent Factory**:
    ```python
-   def create_custom_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
-       server = MCPServerHTTP(url=server_url)
-       agent = Agent('openai:gpt-4o', deps_type=CustomDependencies, mcp_servers=[server])
+   def create_custom_unified_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
+       from mcp.client.sse import sse_client
+       
+       # Use OpenAI o3 for enhanced reasoning capabilities
+       agent = Agent('openai:o3', mcp_servers=[sse_client(server_url)])
 
        @agent.tool
-       async def custom_tool(ctx: RunContext[CustomDependencies], param: str) -> str:
-           # Custom tool implementation
-           return f"Processed: {param}"
+       async def custom_workflow_tool(ctx: RunContext, user_request: str) -> str:
+           # Intelligent tool selection based on request analysis
+           if "crawl" in user_request.lower() or "http" in user_request:
+               # Trigger crawling workflow
+               return await ctx.deps.smart_crawl_url(extract_url(user_request))
+           elif "search" in user_request.lower():
+               # Trigger search workflow  
+               return await ctx.deps.perform_rag_query(extract_query(user_request))
+           # Add more intelligent routing logic
 
        return agent
    ```
 
-2. **Define Custom Dependencies**:
+2. **Follow Unified Architecture Pattern**:
    ```python
-   @dataclass
-   class CustomDependencies:
-       custom_config: str = "default"
-       # Add your configuration parameters
+   # Single agent that intelligently orchestrates multiple MCP tools
+   # Based on natural language intent analysis
+   # Uses OpenAI o3 for enhanced reasoning capabilities
    ```
 
 3. **Create Structured Outputs**:
    ```python
-   class CustomResult(BaseModel):
+   class UnifiedResult(BaseModel):
+       workflow_type: str  # "research", "search", "discovery"
+       tools_used: List[str]  # MCP tools that were called
        success: bool
        data: Any
        metadata: Dict[str, Any]
    ```
 
-4. **Follow Integration Patterns**: Use the documented MCP client patterns with `agent.run_mcp_servers()` context manager
+4. **Follow Integration Patterns**: Use official MCP Python SDK patterns with `agent.run_mcp_servers()` context manager
 
 ## Contributing
 
