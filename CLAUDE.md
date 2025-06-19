@@ -319,6 +319,9 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
   - **Risk**: Production readiness and quality assurance
 
 **Recently Completed Critical Tasks (Jan 2025):**
+- [x] **TASK-048**: Remove legacy agent functions from src/pydantic_agent/agent.py (2025-01-19)
+  - **Completed**: Cleaned up create_crawl_agent, create_rag_agent, create_workflow_agent functions (187 lines removed)
+  - **Result**: File reduced from 261 lines to 82 lines, unified agent architecture fully established
 - [x] **TASK-043**: Split src/crawl4ai_mcp.py (1,121 lines) into modular components (2025-01-19)
   - **Completed**: 6 focused modules all under 500 lines - mcp_server.py (118), mcp_crawl_tools.py (398), mcp_search_tools.py (411), crawl_strategies.py (165), content_processing.py (146), crawl4ai_mcp.py (80)
   - **Result**: Clean separation of concerns with backward compatibility maintained
