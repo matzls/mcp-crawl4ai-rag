@@ -405,7 +405,7 @@ This is a Model Context Protocol (MCP) server that provides web crawling and RAG
 **Migration Complete: 100% ✅**
 - **Files Updated**: 4 agent files migrated from GPT-4 Turbo to o3
   - `unified_agent.py`: Main orchestrator (already had o3)
-  - `agent.py`: 3 legacy agents migrated
+  - `agent.py`: Legacy agents removed, now contains only utilities
   - `basic_crawl_example.py`: Example updated
   - `rag_workflow_example.py`: Multiple references updated
 - **Consistency**: All agents now use `openai:o3` for enhanced reasoning capabilities

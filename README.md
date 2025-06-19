@@ -54,7 +54,7 @@ The Crawl4AI RAG MCP server is just the beginning. Here's where we're headed:
 - **Intelligent Workflow Orchestration**: Combines multiple MCP tools for complex multi-step operations
 - **Type-Safe Configuration**: Structured dependency injection with Pydantic models
 - **Structured Outputs**: Validated responses with comprehensive metadata
-- **Agent Specialization**: Dedicated agents for crawling, RAG queries, and workflow orchestration
+- **Unified Agent Architecture**: Single intelligent orchestrator that automatically selects optimal tools based on user intent
 - **MCP Client Integration**: Seamless connection to MCP server using documented patterns
 - **Standard Logfire Observability**: Built-in tracing and monitoring using Pydantic AI's native Logfire integration
 
@@ -291,7 +291,7 @@ mcp-crawl4ai-rag/
 │   └── pydantic_agent/          # Unified agent layer
 │       ├── __init__.py          # Agent exports
 │       ├── unified_agent.py     # Single orchestrator agent (OpenAI o3)
-│       ├── agent.py             # Legacy agent functions (deprecated)
+│       ├── agent.py             # MCP connection utilities
 │       ├── dependencies.py     # Type-safe dependency injection models
 │       ├── outputs.py           # Structured output validation models
 │       ├── tools.py             # Agent tool implementations
