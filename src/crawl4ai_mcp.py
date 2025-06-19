@@ -37,9 +37,6 @@ from utils import (
 
 from logging_config import (
     log_mcp_tool_execution,
-    log_database_operation,
-    log_crawling_operation,
-    log_rag_query,
     log_system_startup,
     logger
 )

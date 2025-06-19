@@ -8,7 +8,6 @@ import json
 import asyncpg
 from urllib.parse import urlparse
 import openai
-import re
 import time
 
 # Load OpenAI API key for embeddings
@@ -495,7 +494,7 @@ def extract_code_blocks(markdown_content: str, min_length: int = 1000) -> List[D
         if len(lines) > 1:
             # Check if first line is a language specifier (no spaces, common language names)
             first_line = lines[0].strip()
-            if first_line and not ' ' in first_line and len(first_line) < 20:
+            if first_line and ' ' not in first_line and len(first_line) < 20:
                 language = first_line
                 code_content = lines[1].strip() if len(lines) > 1 else ""
             else:
@@ -633,7 +632,7 @@ async def add_code_examples_to_postgres(
             if embedding and not all(v == 0.0 for v in embedding):
                 valid_embeddings.append(embedding)
             else:
-                print(f"Warning: Zero or invalid embedding detected, creating new one...")
+                print("Warning: Zero or invalid embedding detected, creating new one...")
                 # Try to create a single embedding as fallback
                 single_embedding = create_embedding(batch_texts[len(valid_embeddings)])
                 valid_embeddings.append(single_embedding)

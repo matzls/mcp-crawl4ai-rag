@@ -18,12 +18,12 @@ Key Components:
 
 from .dependencies import CrawlDependencies, RAGDependencies, WorkflowDependencies
 from .outputs import CrawlResult, RAGResult, WorkflowResult
-from .agent import (
-    create_crawl_agent,
-    create_rag_agent,
-    create_workflow_agent,
-    create_mcp_connection,
-    run_agent_with_mcp
+from .unified_agent import (
+    create_unified_agent,
+    run_unified_agent,
+    UnifiedAgentDependencies,
+    UnifiedAgentResult,
+    setup_logfire_instrumentation
 )
 
 __all__ = [
@@ -33,11 +33,11 @@ __all__ = [
     "CrawlResult",
     "RAGResult",
     "WorkflowResult",
-    "create_crawl_agent",
-    "create_rag_agent",
-    "create_workflow_agent",
-    "create_mcp_connection",
-    "run_agent_with_mcp",
+    "create_unified_agent",
+    "run_unified_agent",
+    "UnifiedAgentDependencies",
+    "UnifiedAgentResult",
+    "setup_logfire_instrumentation",
 ]
 
 __version__ = "0.1.0"

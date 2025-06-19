@@ -17,7 +17,6 @@ from pydantic_ai import Agent
 
 from ..dependencies import RAGDependencies, WorkflowDependencies
 from ..outputs import RAGResult, WorkflowResult
-from ..agent import RAGAgent, WorkflowAgent
 
 
 async def basic_rag_example():
@@ -85,7 +84,7 @@ async def basic_rag_example():
                 print(f"⏱️  Processing time: {output.processing_time_seconds:.2f}s")
                 print(f"🔄 Reranking applied: {output.reranking_applied}")
                 
-                print(f"\n💡 Answer:")
+                print("\n💡 Answer:")
                 print(f"   {output.answer}")
                 
                 if output.error_details:
@@ -156,7 +155,7 @@ async def research_workflow_example():
             
             # Display workflow results
             output = result.output
-            print(f"\n📋 Workflow Results:")
+            print("\n📋 Workflow Results:")
             print(f"✅ Success: {output.success}")
             print(f"🏷️  Type: {output.workflow_type}")
             print(f"⏱️  Total time: {output.total_time_seconds:.2f}s")
@@ -171,7 +170,7 @@ async def research_workflow_example():
                     print(f"   ❌ Error: {step.error_details}")
             
             # Show final result
-            print(f"\n🎯 Final Result:")
+            print("\n🎯 Final Result:")
             if isinstance(output.final_result, str):
                 print(f"   {output.final_result}")
             else:
@@ -179,7 +178,7 @@ async def research_workflow_example():
             
             # Show recommendations
             if output.recommendations:
-                print(f"\n💡 Recommendations:")
+                print("\n💡 Recommendations:")
                 for rec in output.recommendations:
                     print(f"   • {rec}")
         

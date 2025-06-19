@@ -5,12 +5,18 @@ This module implements the new architecture with one agent that intelligently
 selects and orchestrates the 5 MCP tools based on user intent and context.
 """
 
-import os
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.mcp import MCPServerSSE
 from dataclasses import dataclass
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from the project root .env file
+project_root = Path(__file__).resolve().parent.parent.parent
+dotenv_path = project_root / '.env'
+load_dotenv(dotenv_path, override=True)
 
 # Import logfire for agent instrumentation
 try:
@@ -42,7 +48,7 @@ def setup_logfire_instrumentation():
         logfire.instrument_httpx(capture_all=True)
 
         print("✓ Logfire instrumentation configured successfully")
-        print(f"🔗 Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent")
+        print("🔗 Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent")
         return True
 
     except Exception as e:
@@ -56,7 +62,7 @@ except ImportError:
     import sys
     from pathlib import Path
     sys.path.append(str(Path(__file__).parent.parent))
-    from logging_config import log_info, log_error
+    from logging_config import log_info
 
 
 @dataclass
@@ -154,7 +160,7 @@ def create_unified_agent(server_url: str = "http://localhost:8051/sse") -> Agent
     
     # Build agent configuration
     agent_kwargs = {
-        'model': 'openai:o3',
+        'model': 'openai:gpt-4.1',
         'deps_type': UnifiedAgentDependencies,
         'output_type': UnifiedAgentResult,
         'mcp_servers': [server],
