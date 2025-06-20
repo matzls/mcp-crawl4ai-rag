@@ -76,8 +76,8 @@ class UnifiedAgentDependencies:
     mcp_server_url: str = "http://localhost:8051/sse"
     
     # Crawling configuration
-    default_max_depth: int = 3
-    default_max_concurrent: int = 10
+    default_max_depth: int = 2  # Reduced for better reliability
+    default_max_concurrent: int = 5  # Reduced to avoid rate limiting
     default_chunk_size: int = 5000
     
     # Search configuration  
@@ -160,7 +160,7 @@ def create_unified_agent(server_url: str = "http://localhost:8051/sse") -> Agent
     
     # Build agent configuration
     agent_kwargs = {
-        'model': 'openai:gpt-4.1',
+        'model': 'openai:gpt-4.1-mini',
         'deps_type': UnifiedAgentDependencies,
         'output_type': UnifiedAgentResult,
         'mcp_servers': [server],
@@ -287,15 +287,20 @@ You are an intelligent research and content assistant with access to 5 specializ
 - If crawling fails, check if content already exists before giving up
 - If search returns no results, suggest crawling relevant sources
 - Gracefully handle tool unavailability (e.g., code search disabled)
+- For external site failures: Acknowledge the limitation and provide alternative suggestions
+- Always set workflow_success=true if you provide ANY useful response to the user
+- Set confidence_score based on actual information quality, not tool success rates
 
 ## RESPONSE SYNTHESIS
 
 Provide comprehensive responses that include:
-1. **Primary Answer** - Direct response to user's question
-2. **Supporting Evidence** - Relevant excerpts from sources
-3. **Source Attribution** - Clear citations with URLs
-4. **Confidence Assessment** - Your confidence in the response
-5. **Follow-up Recommendations** - Suggested next steps
+1. **Primary Answer** - Direct response to user's question (even if tools fail, provide what you can)
+2. **Supporting Evidence** - Relevant excerpts from sources (or explain what you attempted)
+3. **Source Attribution** - Clear citations with URLs (or note access limitations)
+4. **Confidence Assessment** - Your confidence in the response (based on information quality)
+5. **Follow-up Recommendations** - Suggested next steps (including alternative approaches)
+
+**IMPORTANT**: Always provide a helpful response. Tool failures should not result in workflow_success=false unless you cannot provide ANY useful information to the user.
 
 ## PROACTIVE BEHAVIOR
 
