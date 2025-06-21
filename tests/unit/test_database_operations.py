@@ -9,10 +9,7 @@ import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 import json
 
-# Add src to path for imports
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+# Import structure relies on pytest.ini pythonpath = src
 
 from database.operations import (
     get_postgres_connection,

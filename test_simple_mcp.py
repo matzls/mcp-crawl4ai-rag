@@ -8,6 +8,7 @@ import sys
 import subprocess
 import time
 from pathlib import Path
+import pytest
 
 # Add the src directory to the path
 project_root = Path(__file__).parent
@@ -15,6 +16,7 @@ src_path = project_root / "src"
 sys.path.insert(0, str(src_path))
 
 
+@pytest.mark.asyncio
 async def test_mcp_server_basic():
     """Test basic MCP server startup and response."""
     print("🚀 Testing basic MCP server functionality")
