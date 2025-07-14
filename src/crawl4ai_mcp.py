@@ -4,7 +4,8 @@ MCP server for web crawling with Crawl4AI.
 DEPRECATED: This module has been refactored into multiple components for better maintainability.
 The core functionality is now split across:
 - mcp_server.py: Core MCP server setup and lifecycle management
-- mcp_tools.py: All 5 MCP tool implementations  
+- mcp_crawl_tools.py: Crawling MCP tools (2 tools)
+- mcp_search_tools.py: Search MCP tools (3 tools)
 - crawl_strategies.py: Crawling strategy implementations
 - content_processing.py: Content processing and search enhancements
 
@@ -46,36 +47,15 @@ from content_processing import (
     rerank_results
 )
 
-# Re-export for backward compatibility
-__all__ = [
-    # Core server components
-    "Crawl4AIContext",
-    "crawl4ai_lifespan", 
-    "mcp",
-    "main",
-    
-    # MCP tools
-    "crawl_single_page",
-    "smart_crawl_url", 
-    "get_available_sources",
-    "perform_rag_query",
-    "search_code_examples",
-    
-    # Crawling strategies
-    "is_sitemap",
-    "is_txt",
-    "parse_sitemap", 
-    "crawl_markdown_file",
-    "crawl_batch",
-    "crawl_recursive_internal_links",
-    
-    # Content processing
-    "smart_chunk_markdown",
-    "extract_section_info",
-    "process_code_example", 
-    "rerank_results"
-]
+from utils import (
+    create_postgres_pool,
+    add_documents_to_postgres,
+    search_documents,
+    extract_code_blocks,
+    generate_code_example_summary
+)
 
+# For backward compatibility, expose main function
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
