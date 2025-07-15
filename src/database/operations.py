@@ -229,7 +229,7 @@ async def add_documents_to_postgres(
                                     record["content"],
                                     json.dumps(record["metadata"]),
                                     record["source_id"],
-                                    embedding_to_vector_string(record["embedding"])
+                                    _embedding_to_vector_string(record["embedding"])
                                 )
                                 successful_inserts += 1
                             except Exception as individual_error:
@@ -347,7 +347,7 @@ async def add_code_examples_to_postgres(
                                     record['summary'],
                                     json.dumps(record['metadata']),
                                     record['source_id'],
-                                    embedding_to_vector_string(record['embedding'])
+                                    _embedding_to_vector_string(record['embedding'])
                                 )
                                 successful_inserts += 1
                             except Exception as individual_error:

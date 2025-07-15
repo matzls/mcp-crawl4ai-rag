@@ -5,7 +5,6 @@ This module provides the crawling-focused MCP tools that gather new content
 from websites and store it in the database.
 """
 from mcp.server.fastmcp import Context
-from typing import List, Dict, Any
 from urllib.parse import urlparse
 import json
 import asyncio
@@ -33,7 +32,8 @@ from utils import (
     extract_code_blocks,
     add_code_examples_to_postgres,
     update_source_info,
-    extract_source_summary
+    extract_source_summary,
+    create_embeddings_batch
 )
 from logging_config import log_mcp_tool_execution
 
@@ -106,15 +106,15 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                 # Accumulate word count
                 total_word_count += meta.get("word_count", 0)
             
-            # Create url_to_full_document mapping
-            url_to_full_document = {url: result.markdown}
-            
             # Update source information FIRST (before inserting documents)
             source_summary = extract_source_summary(source_id, result.markdown[:5000])  # Use first 5000 chars for summary
             await update_source_info(postgres_pool, source_id, source_summary, total_word_count)
             
+            # Generate embeddings for the content chunks
+            embeddings = create_embeddings_batch(contents)
+            
             # Add documentation chunks to PostgreSQL (AFTER source exists)
-            await add_documents_to_postgres(postgres_pool, urls, chunk_numbers, contents, metadatas, url_to_full_document)
+            await add_documents_to_postgres(postgres_pool, urls, chunk_numbers, contents, metadatas, embeddings)
             
             # Extract and process code examples only if enabled
             extract_code_examples = os.getenv("USE_AGENTIC_RAG", "false") == "true"
@@ -154,6 +154,9 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                         }
                         code_metadatas.append(code_meta)
                     
+                    # Generate embeddings for code examples
+                    code_embeddings = create_embeddings_batch(code_examples)
+                    
                     # Add code examples to PostgreSQL
                     await add_code_examples_to_postgres(
                         postgres_pool, 
@@ -161,7 +164,8 @@ async def crawl_single_page(ctx: Context, url: str) -> str:
                         code_chunk_numbers, 
                         code_examples, 
                         code_summaries, 
-                        code_metadatas
+                        code_metadatas,
+                        code_embeddings
                     )
             
             return json.dumps({
@@ -318,15 +322,17 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
             word_count = source_word_counts.get(source_id, 0)
             await update_source_info(postgres_pool, source_id, summary, word_count)
         
+        # Generate embeddings for the content chunks
+        embeddings = create_embeddings_batch(contents)
+        
         # Add documentation chunks to PostgreSQL (AFTER sources exist)
         batch_size = 20
-        await add_documents_to_postgres(postgres_pool, urls, chunk_numbers, contents, metadatas, url_to_full_document, batch_size=batch_size)
+        await add_documents_to_postgres(postgres_pool, urls, chunk_numbers, contents, metadatas, embeddings, batch_size=batch_size)
         
         # Extract and process code examples from all documents only if enabled
         extract_code_examples_enabled = os.getenv("USE_AGENTIC_RAG", "false") == "true"
         code_examples = []  # Initialize to empty list
         if extract_code_examples_enabled:
-            all_code_blocks = []
             code_urls = []
             code_chunk_numbers = []
             code_examples = []
@@ -371,6 +377,9 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
             
             # Add all code examples to PostgreSQL
             if code_examples:
+                # Generate embeddings for code examples
+                code_embeddings = create_embeddings_batch(code_examples)
+                
                 await add_code_examples_to_postgres(
                     postgres_pool, 
                     code_urls, 
@@ -378,6 +387,7 @@ async def smart_crawl_url(ctx: Context, url: str, max_depth: int = 3, max_concur
                     code_examples, 
                     code_summaries, 
                     code_metadatas,
+                    code_embeddings,
                     batch_size=batch_size
                 )
         
