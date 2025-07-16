@@ -4,21 +4,19 @@
   <em>Web Crawling and RAG Capabilities for AI Agents and AI Coding Assistants</em>
 </p>
 
-A powerful implementation of the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) integrated with [Crawl4AI](https://crawl4ai.com), PostgreSQL, and [Pydantic AI](https://ai.pydantic.dev) for providing AI agents and AI coding assistants with advanced web crawling, RAG capabilities, and intelligent agent orchestration.
+A production-ready [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that provides **5 powerful tools** for web crawling and RAG operations. Built with [Crawl4AI](https://crawl4ai.com) and PostgreSQL + pgvector, this server enables any MCP-compatible AI agent or coding assistant to **scrape anything** and then **use that knowledge anywhere** for RAG.
 
-With this MCP server, you can <b>scrape anything</b> and then <b>use that knowledge anywhere</b> for RAG.
+> **✅ Production Ready (January 2025)**: All 5 MCP tools verified working, PostgreSQL integration complete, comprehensive testing implemented. System tested with 197 pages crawled in 42.5 seconds with 856 content chunks stored successfully.
 
-> **✅ Latest Updates (January 2025)**: Production-ready system with comprehensive testing completed! All major issues resolved, Pydantic AI agents fully implemented and verified, vector embedding format fixed, function naming conflicts resolved, and startup optimized for 90% faster performance. System tested with 197 pages crawled in 42.5 seconds with 856 content chunks stored successfully.
-
-The primary goal is to bring this MCP server into [Archon](https://github.com/coleam00/Archon) as I evolve it to be more of a knowledge engine for AI coding assistants to build AI agents. This first version of the Crawl4AI/RAG MCP server will be improved upon greatly soon, especially making it more configurable so you can use different embedding models and run everything locally with Ollama.
+**Primary Use Case**: Connect this MCP server to Claude Desktop, Windsurf, or any MCP-compatible AI agent to provide intelligent web crawling and RAG capabilities. The goal is to integrate this into [Archon](https://github.com/coleam00/Archon) as a knowledge engine for AI coding assistants.
 
 ## Overview
 
-This project provides both an MCP server and intelligent agent capabilities:
+This MCP server provides **5 core tools** that external AI agents and coding assistants can use:
 
-**MCP Server**: Provides tools that enable AI agents to crawl websites, store content in a vector database (PostgreSQL with pgvector), and perform RAG over the crawled content. It follows the best practices for building MCP servers based on the [Mem0 MCP server template](https://github.com/coleam00/mcp-mem0/) I provided on my channel previously.
+**Core Value Proposition**: Instead of manually copying and pasting documentation, AI agents can crawl websites, store content in a vector database (PostgreSQL with pgvector), and perform semantic search over the crawled content - all through standardized MCP tool calls.
 
-**Pydantic AI Agents**: Intelligent agent layer that connects to the MCP server as a client, providing structured workflows, type-safe dependency injection, and multi-step reasoning capabilities for complex crawling and RAG operations. **✅ Fully tested and production-ready** with verified agent-to-MCP communication, structured outputs, and robust error handling.
+**Included for Testing**: A Pydantic AI agent is included for testing and demonstration purposes, but the **MCP server is the primary product** designed for integration with external MCP clients.
 
 The server includes several advanced RAG strategies that can be enabled to enhance retrieval quality:
 - **Contextual Embeddings** for enriched semantic understanding
@@ -56,7 +54,7 @@ The Crawl4AI RAG MCP server is just the beginning. Here's where we're headed:
 - **Intelligent Workflow Orchestration**: Combines multiple MCP tools for complex multi-step operations
 - **Type-Safe Configuration**: Structured dependency injection with Pydantic models
 - **Structured Outputs**: Validated responses with comprehensive metadata
-- **Agent Specialization**: Dedicated agents for crawling, RAG queries, and workflow orchestration
+- **Unified Agent Architecture**: Single intelligent orchestrator that automatically selects optimal tools based on user intent
 - **MCP Client Integration**: Seamless connection to MCP server using documented patterns
 - **Standard Logfire Observability**: Built-in tracing and monitoring using Pydantic AI's native Logfire integration
 
@@ -128,102 +126,115 @@ The typical workflow combines multiple tools:
 3. **Search content**: Use `perform_rag_query` for general content or `search_code_examples` for code-specific queries
 4. **Iterate**: Refine searches with source filtering based on discovered sources
 
-## Pydantic AI Agents
+## Integration with MCP Clients
 
-The project includes intelligent agents that connect to the MCP server as clients, providing higher-level orchestration capabilities:
+This MCP server is designed to be used by external AI agents and coding assistants through the Model Context Protocol. Here's how to connect:
 
-> **✅ Production Ready**: Comprehensive testing completed with verified agent-to-MCP communication, structured workflows, and robust error handling. Performance tested with 197 pages crawled in 42.5 seconds, 856 content chunks stored successfully.
+### SSE Configuration (Recommended)
 
-### Agent Types
+For Claude Desktop, Windsurf, or any SSE-compatible MCP client:
 
-#### `create_crawl_agent(server_url: str = "http://localhost:8051/sse")`
-Specialized agent for web crawling operations with intelligent strategy selection.
-
-```python
-from pydantic_agent import create_crawl_agent, CrawlDependencies
-
-# Create crawling agent
-agent = create_crawl_agent()
-dependencies = CrawlDependencies()
-
-# Run intelligent crawling workflow
-async with agent.run_mcp_servers():
-    result = await agent.run(
-        "Crawl the Python documentation and extract all tutorial content",
-        deps=dependencies
-    )
+```json
+{
+  "mcpServers": {
+    "crawl4ai-rag": {
+      "transport": "sse",
+      "url": "http://localhost:8051/sse"
+    }
+  }
+}
 ```
 
-#### `create_rag_agent(server_url: str = "http://localhost:8051/sse")`
-Focused on content retrieval and semantic search operations.
+> **Note for Windsurf users**: Use `serverUrl` instead of `url`:
+> ```json
+> {
+>   "mcpServers": {
+>     "crawl4ai-rag": {
+>       "transport": "sse", 
+>       "serverUrl": "http://localhost:8051/sse"
+>     }
+>   }
+> }
+> ```
 
-```python
-from pydantic_agent import create_rag_agent, RAGDependencies
+### Stdio Configuration  
 
-# Create RAG agent
-agent = create_rag_agent()
-dependencies = RAGDependencies()
+For applications that prefer stdio transport:
 
-# Run intelligent search workflow
-async with agent.run_mcp_servers():
-    result = await agent.run(
-        "Find information about Python async/await patterns and provide examples",
-        deps=dependencies
-    )
+```json
+{
+  "mcpServers": {
+    "crawl4ai-rag": {
+      "command": "python",
+      "args": ["path/to/crawl4ai-mcp/src/crawl4ai_mcp.py"],
+      "env": {
+        "TRANSPORT": "stdio",
+        "OPENAI_API_KEY": "your_openai_api_key",
+        "DATABASE_URL": "postgresql://mg@localhost:5432/crawl4ai_rag"
+      }
+    }
+  }
+}
 ```
 
-#### `create_workflow_agent(server_url: str = "http://localhost:8051/sse")`
-Orchestrates complex multi-step operations combining crawling and RAG.
+### Using with uv
 
-```python
-from pydantic_agent import create_workflow_agent, WorkflowDependencies
-
-# Create workflow agent
-agent = create_workflow_agent()
-dependencies = WorkflowDependencies()
-
-# Run complex multi-step workflow
-async with agent.run_mcp_servers():
-    result = await agent.run(
-        "Research FastAPI documentation, extract key concepts, and create a knowledge base for API development questions",
-        deps=dependencies
-    )
+```json
+{
+  "mcpServers": {
+    "crawl4ai-rag": {
+      "command": "uv",
+      "args": ["run", "src/crawl4ai_mcp.py"],
+      "cwd": "/path/to/mcp-crawl4ai-rag",
+      "env": {
+        "TRANSPORT": "stdio",
+        "OPENAI_API_KEY": "your_openai_api_key", 
+        "DATABASE_URL": "postgresql://mg@localhost:5432/crawl4ai_rag"
+      }
+    }
+  }
+}
 ```
 
-### Agent Features
+### Available MCP Tools
 
-- **✅ Structured Outputs**: All agents return validated Pydantic models (CrawlResult, RAGResult, WorkflowResult) - **Tested and verified**
-- **✅ Type-Safe Dependencies**: Configuration through typed dependency injection - **Production ready**
-- **✅ Tool Registration**: Uses `@agent.tool` decorators with `RunContext` for dependency access - **Fully functional**
-- **✅ MCP Integration**: Follows documented patterns with `MCPServerSSE` and `agent.run_mcp_servers()` - **Verified working**
-- **✅ Error Handling**: Graceful error handling with informative error messages - **Robust and tested**
-- **✅ Performance**: Tested with large-scale operations (197 pages, 856 chunks) - **Production validated**
-- **✅ Logfire Observability**: Standard Pydantic AI instrumentation with real-time tracing - **Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent**
+Once connected, your AI agent will have access to these 5 tools:
+
+1. **`crawl_single_page`** - Quick single page crawl
+2. **`smart_crawl_url`** - Intelligent multi-page crawling  
+3. **`get_available_sources`** - List crawled sources
+4. **`perform_rag_query`** - Semantic search over content
+5. **`search_code_examples`** - Code-specific search (if enabled)
+
+## Testing with Included Agent
+
+For testing and demonstration purposes, this project includes a Pydantic AI agent that connects to the MCP server as a client.
+
+> **Note**: The agent is provided for testing only. The **MCP server is the primary product** designed for external integrations.
+
+### Quick Testing Example
+
+```python
+from pydantic_agent.unified_agent import create_unified_agent
+
+# Test the MCP server using the included agent
+agent = create_unified_agent("http://localhost:8051/sse")
+
+async with agent.run_mcp_servers():
+    # Test crawling
+    result = await agent.run("Crawl https://docs.python.org/3/tutorial/")
+    
+    # Test search  
+    result = await agent.run("Find information about Python functions")
+```
 
 ### Testing Results
 
-The Pydantic AI agent implementation has undergone comprehensive testing with excellent results:
-
-**✅ Agent-to-MCP Communication**
-- Perfect connectivity via MCPServerSSE at http://localhost:8051/sse
-- Successful tool discovery and execution
-- Verified structured workflow execution
-
-**✅ Performance Metrics**
-- **197 pages crawled** in 42.5 seconds (Python documentation)
+✅ **MCP Server Performance Verified**:
+- **197 pages crawled** in 42.5 seconds
 - **856 content chunks** stored successfully in PostgreSQL
-- **Robust error handling** with 19/20 embeddings successful despite API issues
-
-**✅ Structured Outputs**
-- CrawlResult validation working flawlessly
-- Complete metadata tracking (success status, metrics, summaries)
-- Type-safe dependency injection verified
-
-**✅ Production Readiness**
-- All system dependencies operational
-- Database schema complete and tested
-- MCP server running reliably on port 8051
-- Natural language interface responding correctly
+- All 5 MCP tools working correctly
+- Both SSE and stdio transports operational
 
 ## Prerequisites
 
@@ -274,20 +285,30 @@ The Pydantic AI agent implementation has undergone comprehensive testing with ex
 ```
 mcp-crawl4ai-rag/
 ├── src/
-│   ├── crawl4ai_mcp.py          # Main MCP server implementation
+│   ├── crawl4ai_mcp.py          # Main MCP server implementation (official MCP SDK)
 │   ├── utils.py                 # Database and RAG utilities
-│   └── pydantic_agent/          # Intelligent agent layer
+│   ├── logging_config.py        # Logfire observability configuration
+│   └── pydantic_agent/          # Unified agent layer
 │       ├── __init__.py          # Agent exports
-│       ├── agent.py             # Agent factory functions and MCP integration
+│       ├── unified_agent.py     # Single orchestrator agent (OpenAI o3)
+│       ├── agent.py             # MCP connection utilities
 │       ├── dependencies.py     # Type-safe dependency injection models
 │       ├── outputs.py           # Structured output validation models
 │       ├── tools.py             # Agent tool implementations
 │       └── examples/            # Usage examples and workflows
+│           ├── unified_agent_example.py     # Main example
 │           ├── basic_crawl_example.py
 │           └── rag_workflow_example.py
+├── tests/                       # Testing infrastructure
+│   ├── __init__.py             # Test package initialization
+│   ├── test_mcp_tools.py       # Comprehensive MCP tool testing
+│   └── test_logging.py         # Logging verification tests
 ├── crawled_pages.sql            # PostgreSQL schema
-├── pyproject.toml               # Project dependencies
+├── pyproject.toml               # Project dependencies + dev dependencies
+├── pytest.ini                  # Pytest configuration
 ├── .env                         # Environment configuration
+├── cli_chat.py                  # Interactive CLI interface
+├── db_browser.py                # Custom database browser with rich CLI interface
 └── start_mcp_server.sh          # Optimized startup script
 ```
 
@@ -351,8 +372,8 @@ OPENAI_API_KEY=your_openai_api_key
 # Logfire Observability (Optional)
 LOGFIRE_TOKEN=your_logfire_token
 
-# LLM for summaries and contextual embeddings
-MODEL_CHOICE=gpt-4o-mini
+# LLM for summaries and contextual embeddings  
+MODEL_CHOICE=gpt-o3
 
 # RAG Strategies (set to "true" or "false", default to "false")
 USE_CONTEXTUAL_EMBEDDINGS=false
@@ -455,6 +476,140 @@ USE_AGENTIC_RAG=false
 USE_RERANKING=false
 ```
 
+## Database Browsing and Management
+
+The project includes multiple ways to browse and interact with your PostgreSQL database directly, allowing you to inspect crawled content, search data, and monitor the system.
+
+### Method 1: Custom Database Browser (Recommended)
+
+A custom Python script provides an interactive CLI interface specifically designed for the Crawl4AI RAG database:
+
+```bash
+# Install required dependency
+pip install asyncpg
+
+# Run the interactive database browser
+python db_browser.py
+```
+
+**Features:**
+- 📊 **Database Overview** - Statistics for all tables (sources, crawled_pages, code_examples)
+- 📚 **Source Browser** - Lists all crawled sources with metadata and chunk counts
+- 📄 **Recent Content Browser** - Shows recently crawled pages with previews
+- 🔍 **Content Search** - Search through crawled content by keywords
+- 💻 **Code Examples Browser** - Browse extracted code examples (if `USE_AGENTIC_RAG=true`)
+- 🔧 **Custom SQL Query** - Execute any SQL query you want
+- 🎨 **Rich Formatting** - Beautiful CLI interface with tables and panels
+
+### Method 2: Command Line (psql) - Quick Access
+
+**Basic connection:**
+```bash
+# Connect to your database
+psql -h localhost -U mg -d crawl4ai_rag
+
+# Or using the DATABASE_URL from your .env
+psql postgresql://mg@localhost:5432/crawl4ai_rag
+```
+
+**Quick data exploration commands:**
+```bash
+# Check what content you have
+psql postgresql://mg@localhost:5432/crawl4ai_rag -c "
+SELECT source_id, summary, total_word_count, created_at::date
+FROM sources
+ORDER BY created_at DESC;"
+
+# Count crawled pages by source
+psql postgresql://mg@localhost:5432/crawl4ai_rag -c "
+SELECT source_id, COUNT(*) as chunk_count,
+       MIN(created_at) as first_crawled,
+       MAX(created_at) as last_crawled
+FROM crawled_pages
+GROUP BY source_id
+ORDER BY chunk_count DESC;"
+
+# Recent crawled content
+psql postgresql://mg@localhost:5432/crawl4ai_rag -c "
+SELECT url, chunk_number, LEFT(content, 100) as preview, source_id, created_at::date
+FROM crawled_pages
+ORDER BY created_at DESC
+LIMIT 10;"
+
+# Search for specific content (text search)
+psql postgresql://mg@localhost:5432/crawl4ai_rag -c "
+SELECT url, chunk_number, LEFT(content, 150) as preview
+FROM crawled_pages
+WHERE content ILIKE '%python%'
+LIMIT 5;"
+
+# Database size information
+psql postgresql://mg@localhost:5432/crawl4ai_rag -c "
+SELECT
+    schemaname,
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;"
+```
+
+### Method 3: GUI Database Tools
+
+**pgAdmin (Web-based, Free):**
+```bash
+# Install pgAdmin
+brew install --cask pgadmin4
+
+# Setup connection:
+# - Name: Crawl4AI RAG
+# - Host: localhost, Port: 5432
+# - Database: crawl4ai_rag, Username: mg
+```
+
+**DBeaver (Cross-platform, Free):**
+```bash
+# Install DBeaver Community Edition
+brew install --cask dbeaver-community
+
+# Connection: localhost:5432/crawl4ai_rag (user: mg)
+```
+
+**TablePlus (macOS, Free tier available):**
+```bash
+# Install TablePlus
+brew install --cask tableplus
+
+# Free tier: 2 connections, 2 tabs (sufficient for single database)
+```
+
+### Method 4: Database Schema Exploration
+
+**Useful psql commands once connected:**
+```sql
+-- List all tables
+\dt
+
+-- Describe table structure
+\d sources
+\d crawled_pages
+\d code_examples
+
+-- View table sizes
+\dt+
+
+-- List all indexes
+\di
+
+-- Show database info
+\l
+```
+
+**Key tables in your database:**
+- **`sources`** - Crawled source metadata (domains, summaries, word counts)
+- **`crawled_pages`** - Content chunks with vector embeddings for semantic search
+- **`code_examples`** - Extracted code examples with AI-generated summaries (if `USE_AGENTIC_RAG=true`)
+
 ## Running the Server
 
 ### Quick Start (Recommended)
@@ -480,142 +635,7 @@ uv run src/crawl4ai_mcp.py
 
 The server will start and listen on the configured host and port (default: http://localhost:8051/sse).
 
-## Using Pydantic AI Agents
-
-Once the MCP server is running, you can use the Pydantic AI agents for intelligent workflows:
-
-### Basic Agent Usage
-
-```python
-import asyncio
-from pydantic_agent import create_crawl_agent, create_rag_agent, CrawlDependencies, RAGDependencies
-
-async def main():
-    # Create agents
-    crawl_agent = create_crawl_agent("http://localhost:8051/sse")
-    rag_agent = create_rag_agent("http://localhost:8051/sse")
-
-    # Set up dependencies
-    crawl_deps = CrawlDependencies()
-    rag_deps = RAGDependencies()
-
-    # Crawl content
-    async with crawl_agent.run_mcp_servers():
-        crawl_result = await crawl_agent.run(
-            "Crawl https://docs.python.org/3/tutorial/ and index all tutorial content",
-            deps=crawl_deps
-        )
-
-    # Search content
-    async with rag_agent.run_mcp_servers():
-        search_result = await rag_agent.run(
-            "Find information about Python functions and provide examples",
-            deps=rag_deps
-        )
-
-    print(f"Crawled: {crawl_result.data}")
-    print(f"Found: {search_result.data}")
-
-# Run the example
-asyncio.run(main())
-```
-
-### Advanced Workflow Example
-
-```python
-from pydantic_agent import create_workflow_agent, WorkflowDependencies
-
-async def research_workflow():
-    agent = create_workflow_agent()
-    deps = WorkflowDependencies()
-
-    async with agent.run_mcp_servers():
-        result = await agent.run(
-            """
-            Research FastAPI documentation:
-            1. Crawl the main FastAPI docs
-            2. Extract key concepts about dependency injection
-            3. Find code examples for async endpoints
-            4. Create a summary of best practices
-            """,
-            deps=deps
-        )
-
-    return result
-
-# Run advanced workflow
-result = asyncio.run(research_workflow())
-```
-
-## Integration with MCP Clients
-
-### SSE Configuration
-
-Once you have the server running with SSE transport, you can connect to it using this configuration:
-
-```json
-{
-  "mcpServers": {
-    "crawl4ai-rag": {
-      "transport": "sse",
-      "url": "http://localhost:8051/sse"
-    }
-  }
-}
-```
-
-> **Note for Windsurf users**: Use `serverUrl` instead of `url` in your configuration:
-> ```json
-> {
->   "mcpServers": {
->     "crawl4ai-rag": {
->       "transport": "sse",
->       "serverUrl": "http://localhost:8051/sse"
->     }
->   }
-> }
-> ```
->
-> **Note**: Make sure PostgreSQL 17 is running and accessible at `localhost:5432` before starting the server.
-
-### Stdio Configuration
-
-Add this server to your MCP configuration for Claude Desktop, Windsurf, or any other MCP client:
-
-```json
-{
-  "mcpServers": {
-    "crawl4ai-rag": {
-      "command": "python",
-      "args": ["path/to/crawl4ai-mcp/src/crawl4ai_mcp.py"],
-      "env": {
-        "TRANSPORT": "stdio",
-        "OPENAI_API_KEY": "your_openai_api_key",
-        "DATABASE_URL": "postgresql://mg:@localhost:5432/crawl4ai_rag"
-      }
-    }
-  }
-}
-```
-
-### Alternative: Direct Python Execution
-
-```json
-{
-  "mcpServers": {
-    "crawl4ai-rag": {
-      "command": "uv",
-      "args": ["run", "src/crawl4ai_mcp.py"],
-      "cwd": "/path/to/mcp-crawl4ai-rag",
-      "env": {
-        "TRANSPORT": "stdio",
-        "OPENAI_API_KEY": "your_openai_api_key",
-        "DATABASE_URL": "postgresql://mg:@localhost:5432/crawl4ai_rag"
-      }
-    }
-  }
-}
-```
+> **✅ Ready for Integration**: Your MCP server is now running and ready to accept connections from Claude Desktop, Windsurf, or any MCP-compatible client using the configuration shown in the [Integration section](#integration-with-mcp-clients) above.
 
 ## Troubleshooting
 
@@ -646,6 +666,18 @@ psql -d crawl4ai_rag -c "SELECT 1;"
 ### Testing Your Setup
 
 ```bash
+# Install testing dependencies
+uv pip install -e ".[dev]"
+
+# Run comprehensive test suite
+pytest tests/ -v --cov=src --cov-report=html
+
+# Test MCP tools individually  
+pytest tests/test_mcp_tools.py -v
+
+# Test logging configuration
+pytest tests/test_logging.py -v
+
 # Test MCP Inspector connection
 npx @modelcontextprotocol/inspector
 # Connect to: http://localhost:8051/sse
@@ -654,54 +686,51 @@ npx @modelcontextprotocol/inspector
 # Use crawl_single_page tool with: https://example.com
 ```
 
-## Building Your Own Server and Agents
+## Building Your Own MCP Server
 
-This implementation provides a foundation for building more complex MCP servers and intelligent agents with web crawling capabilities.
+This implementation provides a foundation for building more complex MCP servers with web crawling and RAG capabilities.
 
 ### Extending the MCP Server
 
-To build your own MCP server:
+To build your own MCP server based on this implementation:
 
-1. Add your own tools by creating methods with the `@mcp.tool()` decorator
-2. Create your own lifespan function to add your own dependencies
-3. Modify the `utils.py` file for any helper functions you need
-4. Extend the crawling capabilities by adding more specialized crawlers
+1. **Add Custom Tools**: Create methods with the `@mcp.tool()` decorator from the official MCP Python SDK
+2. **Custom Lifespan Management**: Extend the lifespan function to add your own dependencies (database connections, API clients, etc.)
+3. **Utility Functions**: Modify `utils.py` for domain-specific helper functions
+4. **Specialized Crawlers**: Extend crawling capabilities for specific content types or websites
+5. **Database Schema**: Customize the PostgreSQL schema in `crawled_pages.sql` for your use case
 
-### Creating Custom Agents
+### MCP Server Development Patterns
 
-To build your own Pydantic AI agents:
+```python
+from mcp.server.fastmcp import FastMCP
+from mcp import mcp
 
-1. **Create Agent Factory Functions**:
-   ```python
-   def create_custom_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
-       server = MCPServerHTTP(url=server_url)
-       agent = Agent('openai:gpt-4o', deps_type=CustomDependencies, mcp_servers=[server])
+# Create your custom MCP server
+app = FastMCP("your-server-name")
 
-       @agent.tool
-       async def custom_tool(ctx: RunContext[CustomDependencies], param: str) -> str:
-           # Custom tool implementation
-           return f"Processed: {param}"
+@mcp.tool()
+async def your_custom_tool(ctx: mcp.Context, param: str) -> dict:
+    """Your custom tool description."""
+    # Access shared resources via context
+    db_pool = ctx.request_context.lifespan_context["postgres_pool"]
+    
+    # Implement your logic
+    result = await your_custom_logic(param, db_pool)
+    
+    return {"success": True, "result": result}
+```
 
-       return agent
-   ```
+### Key Design Principles
 
-2. **Define Custom Dependencies**:
-   ```python
-   @dataclass
-   class CustomDependencies:
-       custom_config: str = "default"
-       # Add your configuration parameters
-   ```
+When extending this MCP server:
 
-3. **Create Structured Outputs**:
-   ```python
-   class CustomResult(BaseModel):
-       success: bool
-       data: Any
-       metadata: Dict[str, Any]
-   ```
-
-4. **Follow Integration Patterns**: Use the documented MCP client patterns with `agent.run_mcp_servers()` context manager
+1. **Follow MCP Standards**: Use the official MCP Python SDK patterns for tool registration and context management
+2. **Database-First Design**: PostgreSQL + pgvector provides the foundation for semantic search capabilities  
+3. **Async Everything**: All operations are async for optimal performance
+4. **Structured Responses**: Always return structured JSON responses from MCP tools
+5. **Error Handling**: Implement graceful error handling with informative error messages
+6. **Resource Management**: Use lifespan context for shared resources like database pools
 
 ## Contributing
 
@@ -709,11 +738,12 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 ### Development Areas
 
-- **MCP Server Tools**: Add new crawling capabilities or data processing tools
-- **Pydantic AI Agents**: Create specialized agents for specific domains or workflows
-- **Integration Patterns**: Improve MCP client integration and agent orchestration
-- **Documentation**: Enhance examples and usage patterns
-- **Testing**: Add comprehensive test coverage for both MCP tools and agents
+- **MCP Server Tools**: Add new crawling capabilities, data processing tools, or content extraction methods
+- **Database Integration**: Enhance PostgreSQL schema, vector operations, or search algorithms  
+- **RAG Strategies**: Implement advanced retrieval techniques, chunking strategies, or embedding models
+- **Performance Optimization**: Improve crawling speed, database queries, or memory usage
+- **MCP Client Integration**: Better support for Claude Desktop, Windsurf, and other MCP clients
+- **Testing**: Expand test coverage for MCP tools, database operations, and integration patterns
 
 ## License
 

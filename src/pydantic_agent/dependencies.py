@@ -7,7 +7,7 @@ patterns for configuration and resource management.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 
 @dataclass

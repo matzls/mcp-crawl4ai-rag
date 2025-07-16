@@ -1,21 +1,17 @@
 """
-Main Pydantic AI agent implementation for crawl4ai MCP integration.
+Legacy agent utilities for crawl4ai MCP integration.
 
-This module provides the core agent classes that connect to the crawl4ai MCP server
-as clients, following the documented patterns from Pydantic AI's MCP integration.
+This module provides utility functions for MCP server connections and agent execution.
+The main agent functionality has been moved to unified_agent.py which provides a single
+intelligent orchestrator for all crawling, RAG, and workflow operations.
+
+For new implementations, use the unified agent architecture instead of the legacy
+three-agent approach that was removed in TASK-044.
 """
 
-from typing import Optional, List, Any
-from pydantic_ai import Agent, RunContext
+from typing import Any
+from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerHTTP
-
-try:
-    from .dependencies import CrawlDependencies, RAGDependencies, WorkflowDependencies
-    from .outputs import CrawlResult, RAGResult, WorkflowResult
-except ImportError:
-    # Fallback for when running from different contexts
-    from pydantic_agent.dependencies import CrawlDependencies, RAGDependencies, WorkflowDependencies
-    from pydantic_agent.outputs import CrawlResult, RAGResult, WorkflowResult
 
 # Import logfire for Pydantic AI integration
 try:
@@ -50,184 +46,10 @@ async def create_mcp_connection(server_url: str) -> MCPServerHTTP:
     return MCPServerHTTP(url=server_url)
 
 
-def create_crawl_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
-    """
-    Create a crawling agent specialized for web crawling operations.
-
-    Following the documented Pydantic AI + MCP integration pattern.
-
-    Args:
-        server_url: URL of the crawl4ai MCP server
-
-    Returns:
-        Configured Agent for crawling operations with tools registered
-    """
-    # Create MCP server connection
-    server = MCPServerHTTP(url=server_url)
-
-    # Create agent with MCP server - following documented pattern
-    # Enable logfire instrumentation if available
-    agent_kwargs = {
-        'model': 'openai:gpt-4-turbo',
-        'deps_type': CrawlDependencies,
-        'output_type': CrawlResult,
-        'mcp_servers': [server],
-        'system_prompt': (
-            "You are an intelligent web crawling assistant that helps users efficiently "
-            "crawl and index web content. You have access to a crawl4ai MCP server that "
-            "provides powerful crawling capabilities including single page crawling, "
-            "smart URL detection (sitemaps, text files), and recursive crawling.\n\n"
-            "Your role is to:\n"
-            "1. Analyze the user's crawling requirements\n"
-            "2. Choose the most appropriate crawling strategy\n"
-            "3. Execute the crawling operation using the available tools\n"
-            "4. Provide structured results with clear summaries\n\n"
-            "Always prioritize efficiency and provide helpful summaries of what was accomplished."
-        )
-    }
-    
-    # Add logfire instrumentation if available
-    if LOGFIRE_AVAILABLE:
-        agent_kwargs['logfire'] = {'tags': ['crawl-agent', 'mcp-client']}
-    
-    agent = Agent(**agent_kwargs)
-
-    # Register tools following documented @agent.tool pattern
-    @agent.tool
-    async def intelligent_crawl(
-        ctx: RunContext[CrawlDependencies],
-        url: str,
-        strategy: str = "smart"
-    ) -> str:
-        """
-        Intelligently crawl a URL using the most appropriate strategy.
-
-        Args:
-            ctx: Runtime context with dependencies
-            url: URL to crawl
-            strategy: Crawling strategy ("single", "smart", "recursive")
-
-        Returns:
-            Summary of crawling results
-        """
-        # This will use the MCP server tools automatically
-        # The agent will call the appropriate MCP tools based on the strategy
-        return f"Crawling {url} with {strategy} strategy using MCP server tools"
-
-    return agent
-
-
-def create_rag_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
-    """
-    Create a RAG agent specialized for content retrieval and querying.
-
-    Following the documented Pydantic AI + MCP integration pattern.
-
-    Args:
-        server_url: URL of the crawl4ai MCP server
-
-    Returns:
-        Configured Agent for RAG operations with tools registered
-    """
-    # Create MCP server connection
-    server = MCPServerHTTP(url=server_url)
-
-    # Create agent with MCP server - following documented pattern
-    # Enable logfire instrumentation if available
-    agent_kwargs = {
-        'model': 'openai:gpt-4-turbo',
-        'deps_type': RAGDependencies,
-        'output_type': RAGResult,
-        'mcp_servers': [server],
-        'system_prompt': (
-            "You are an intelligent content retrieval assistant that helps users find "
-            "and synthesize information from crawled web content. You have access to a "
-            "sophisticated RAG system with vector search, hybrid search, and code example "
-            "search capabilities.\n\n"
-            "Your role is to:\n"
-            "1. Understand the user's information needs\n"
-            "2. Choose the most appropriate search strategy\n"
-            "3. Retrieve relevant content from the vector database\n"
-            "4. Synthesize a comprehensive answer from the retrieved content\n"
-            "5. Provide confidence scores and source attribution\n\n"
-            "Always strive to provide accurate, well-sourced answers with appropriate confidence levels."
-        )
-    }
-    
-    # Add logfire instrumentation if available
-    if LOGFIRE_AVAILABLE:
-        agent_kwargs['logfire'] = {'tags': ['rag-agent', 'mcp-client']}
-    
-    agent = Agent(**agent_kwargs)
-
-    # Register tools following documented @agent.tool pattern
-    @agent.tool
-    async def intelligent_search(
-        ctx: RunContext[RAGDependencies],
-        query: str,
-        search_mode: str = "hybrid"
-    ) -> str:
-        """
-        Perform intelligent content search using the most appropriate method.
-
-        Args:
-            ctx: Runtime context with dependencies
-            query: Search query
-            search_mode: Search strategy ("vector", "hybrid", "code")
-
-        Returns:
-            Search results and synthesized answer
-        """
-        # This will use the MCP server tools automatically
-        # The agent will call perform_rag_query and other MCP tools
-        return f"Searching for '{query}' using {search_mode} mode via MCP server"
-
-    return agent
-
-
-def create_workflow_agent(server_url: str = "http://localhost:8051/sse") -> Agent:
-    """
-    Create a workflow agent for complex multi-step operations.
-
-    Following the documented Pydantic AI + MCP integration pattern.
-
-    Args:
-        server_url: URL of the crawl4ai MCP server
-
-    Returns:
-        Configured Agent for workflow orchestration with tools registered
-    """
-    # Create MCP server connection
-    server = MCPServerHTTP(url=server_url)
-
-    # Create agent with MCP server - following documented pattern
-    # Enable logfire instrumentation if available
-    agent_kwargs = {
-        'model': 'openai:gpt-4-turbo',
-        'deps_type': WorkflowDependencies,
-        'output_type': WorkflowResult,
-        'mcp_servers': [server],
-        'system_prompt': (
-            "You are an intelligent workflow orchestrator that combines web crawling "
-            "and content retrieval to accomplish complex research and analysis tasks. "
-            "You can coordinate multiple operations to achieve sophisticated goals.\n\n"
-            "Your role is to:\n"
-            "1. Break down complex requests into manageable steps\n"
-            "2. Execute crawling and RAG operations in the optimal sequence\n"
-            "3. Track progress and handle errors gracefully\n"
-            "4. Synthesize results from multiple steps into coherent outputs\n"
-            "5. Provide recommendations for follow-up actions\n\n"
-            "Always think step-by-step and provide clear progress updates."
-        )
-    }
-    
-    # Add logfire instrumentation if available
-    if LOGFIRE_AVAILABLE:
-        agent_kwargs['logfire'] = {'tags': ['workflow-agent', 'mcp-client']}
-    
-    agent = Agent(**agent_kwargs)
-
-    return agent
+# Legacy agent functions have been removed as part of TASK-044 cleanup.
+# The unified agent architecture in unified_agent.py provides all functionality
+# through a single intelligent orchestrator that can handle crawling, RAG, and
+# workflow operations automatically based on user intent.
 
 
 @log_agent_interaction("generic")

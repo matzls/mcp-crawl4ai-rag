@@ -5,12 +5,18 @@ This module implements the new architecture with one agent that intelligently
 selects and orchestrates the 5 MCP tools based on user intent and context.
 """
 
-import os
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.mcp import MCPServerSSE
 from dataclasses import dataclass
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from the project root .env file
+project_root = Path(__file__).resolve().parent.parent.parent
+dotenv_path = project_root / '.env'
+load_dotenv(dotenv_path, override=True)
 
 # Import logfire for agent instrumentation
 try:
@@ -42,7 +48,7 @@ def setup_logfire_instrumentation():
         logfire.instrument_httpx(capture_all=True)
 
         print("✓ Logfire instrumentation configured successfully")
-        print(f"🔗 Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent")
+        print("🔗 Dashboard: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent")
         return True
 
     except Exception as e:
@@ -50,13 +56,13 @@ def setup_logfire_instrumentation():
         return False
 
 try:
-    from logging_config import logger
+    from logging_config import log_info, log_error
 except ImportError:
     # Fallback for when running from different contexts
     import sys
     from pathlib import Path
     sys.path.append(str(Path(__file__).parent.parent))
-    from logging_config import logger
+    from logging_config import log_info
 
 
 @dataclass
@@ -70,8 +76,8 @@ class UnifiedAgentDependencies:
     mcp_server_url: str = "http://localhost:8051/sse"
     
     # Crawling configuration
-    default_max_depth: int = 3
-    default_max_concurrent: int = 10
+    default_max_depth: int = 2  # Reduced for better reliability
+    default_max_concurrent: int = 5  # Reduced to avoid rate limiting
     default_chunk_size: int = 5000
     
     # Search configuration  
@@ -154,7 +160,7 @@ def create_unified_agent(server_url: str = "http://localhost:8051/sse") -> Agent
     
     # Build agent configuration
     agent_kwargs = {
-        'model': 'openai:o3',
+        'model': 'openai:gpt-4.1-mini',
         'deps_type': UnifiedAgentDependencies,
         'output_type': UnifiedAgentResult,
         'mcp_servers': [server],
@@ -281,15 +287,20 @@ You are an intelligent research and content assistant with access to 5 specializ
 - If crawling fails, check if content already exists before giving up
 - If search returns no results, suggest crawling relevant sources
 - Gracefully handle tool unavailability (e.g., code search disabled)
+- For external site failures: Acknowledge the limitation and provide alternative suggestions
+- Always set workflow_success=true if you provide ANY useful response to the user
+- Set confidence_score based on actual information quality, not tool success rates
 
 ## RESPONSE SYNTHESIS
 
 Provide comprehensive responses that include:
-1. **Primary Answer** - Direct response to user's question
-2. **Supporting Evidence** - Relevant excerpts from sources
-3. **Source Attribution** - Clear citations with URLs
-4. **Confidence Assessment** - Your confidence in the response
-5. **Follow-up Recommendations** - Suggested next steps
+1. **Primary Answer** - Direct response to user's question (even if tools fail, provide what you can)
+2. **Supporting Evidence** - Relevant excerpts from sources (or explain what you attempted)
+3. **Source Attribution** - Clear citations with URLs (or note access limitations)
+4. **Confidence Assessment** - Your confidence in the response (based on information quality)
+5. **Follow-up Recommendations** - Suggested next steps (including alternative approaches)
+
+**IMPORTANT**: Always provide a helpful response. Tool failures should not result in workflow_success=false unless you cannot provide ANY useful information to the user.
 
 ## PROACTIVE BEHAVIOR
 
@@ -318,17 +329,17 @@ async def run_unified_agent(
     Returns:
         Comprehensive result with workflow execution details
     """
-    logger.info("Starting unified agent workflow",
-               query_length=len(user_query),
-               agent_type="unified_orchestrator")
+    log_info("Starting unified agent workflow",
+             query_length=len(user_query),
+             agent_type="unified_orchestrator")
 
     # Run agent with MCP server context - Pydantic AI's built-in instrumentation will handle tracing
     async with agent.run_mcp_servers():
         result = await agent.run(user_query, deps=dependencies)
 
-    logger.info("Unified agent workflow completed",
-               workflow_success=getattr(result.data, 'workflow_success', True),
-               steps_count=len(getattr(result.data, 'steps_executed', [])),
-               total_time=getattr(result.data, 'total_execution_time_seconds', 0))
+    log_info("Unified agent workflow completed",
+             workflow_success=getattr(result.data, 'workflow_success', True),
+             steps_count=len(getattr(result.data, 'steps_executed', [])),
+             total_time=getattr(result.data, 'total_execution_time_seconds', 0))
 
     return result.data

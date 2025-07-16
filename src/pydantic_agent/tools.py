@@ -6,7 +6,6 @@ for the initial implementation. In a production version, these would make
 actual calls to the crawl4ai MCP server.
 """
 
-import json
 from datetime import datetime
 from typing import Optional, Dict, Any, Literal
 

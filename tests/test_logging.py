@@ -10,10 +10,8 @@ import os
 import sys
 from pathlib import Path
 
-# Add the src directory to the path so we can import our modules
+# Import structure relies on pytest.ini pythonpath = src
 project_root = Path(__file__).parent
-src_path = project_root / "src"
-sys.path.insert(0, str(src_path))
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -21,13 +19,16 @@ load_dotenv(project_root / ".env")
 
 from logging_config import (
     configure_logfire, 
-    logger, 
+    log_info,
+    log_error,
     log_system_startup,
     log_crawling_operation,
     log_rag_query
 )
+import pytest
 
 
+@pytest.mark.asyncio
 async def test_logging_setup():
     """Test the logging configuration."""
     print("🧪 Testing logfire logging setup...")
@@ -36,7 +37,7 @@ async def test_logging_setup():
     log_system_startup("test-service", "0.1.0")
     
     # Test basic logging
-    logger.info("Basic logging test", test_type="unit_test", success=True)
+    log_info("Basic logging test", test_type="unit_test", success=True)
     
     # Test crawling operation logging
     log_crawling_operation("https://example.com", "test_crawl")
@@ -48,17 +49,18 @@ async def test_logging_setup():
     try:
         raise ValueError("This is a test error for logging")
     except Exception as e:
-        logger.error("Test error logging", error=str(e), error_type=type(e).__name__)
+        log_error("Test error logging", error=str(e), error_type=type(e).__name__)
     
     # Test structured logging with complex data
-    logger.info("Complex data logging test", 
-                user_data={"prompt": "test", "length": 42},
-                metrics={"execution_time": 1.5, "tokens": 100},
-                tags=["test", "logging", "verification"])
+    log_info("Complex data logging test", 
+             user_data={"prompt": "test", "length": 42},
+             metrics={"execution_time": 1.5, "tokens": 100},
+             tags=["test", "logging", "verification"])
     
     print("✅ Logging tests completed. Check logfire dashboard for entries.")
 
 
+@pytest.mark.asyncio
 async def test_decorators():
     """Test logging decorators."""
     from logging_config import log_mcp_tool_execution, log_agent_interaction

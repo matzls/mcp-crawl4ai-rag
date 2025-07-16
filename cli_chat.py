@@ -42,7 +42,7 @@ from pydantic_agent.unified_agent import (
     UnifiedAgentDependencies,
     setup_logfire_instrumentation
 )
-from logging_config import logger
+from logging_config import log_error
 
 
 class ChatInterface:
@@ -313,7 +313,7 @@ I intelligently choose from 5 specialized tools based on your needs:
         # Warnings for partial failures
         if result.partial_failures:
             failure_text = "\n".join(f"• {failure}" for failure in result.partial_failures)
-            self.print_panel(failure_text, "⚠️  Partial Failures", "orange")
+            self.print_panel(failure_text, "⚠️  Partial Failures", "dark_orange")
     
     async def run(self):
         """Main chat loop."""
@@ -352,7 +352,7 @@ I intelligently choose from 5 specialized tools based on your needs:
                 break
             except Exception as e:
                 self.print_message(f"❌ Unexpected error: {e}", "red")
-                logger.error("CLI chat error", error=str(e), error_type=type(e).__name__)
+                log_error("CLI chat error", error=str(e), error_type=type(e).__name__)
         
         return 0
 

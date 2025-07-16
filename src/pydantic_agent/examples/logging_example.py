@@ -19,8 +19,7 @@ sys.path.insert(0, str(src_path))
 from dotenv import load_dotenv
 load_dotenv(project_root / ".env")
 
-from pydantic_agent.agent import create_crawl_agent, create_rag_agent, run_agent_with_mcp
-from pydantic_agent.dependencies import CrawlDependencies, RAGDependencies
+from pydantic_agent.unified_agent import create_unified_agent, run_unified_agent, UnifiedAgentDependencies
 from logging_config import logger
 
 
@@ -38,30 +37,25 @@ async def demonstrate_logging_workflow():
     
     print("🚀 Starting comprehensive logging demonstration...")
     
-    # Create dependencies
-    crawl_deps = CrawlDependencies(
-        server_url="http://localhost:8051/sse",
-        max_concurrent=3,
-        chunk_size=2000
-    )
-    
-    rag_deps = RAGDependencies(
-        server_url="http://localhost:8051/sse",
-        match_count=5,
+    # Create unified dependencies
+    unified_deps = UnifiedAgentDependencies(
+        mcp_server_url="http://localhost:8051/sse",
+        default_max_concurrent=3,
+        default_chunk_size=2000,
+        default_match_count=5,
         confidence_threshold=0.7
     )
     
-    print("📋 Creating agents (check logfire for agent creation logs)...")
+    print("📋 Creating unified agent (check logfire for agent creation logs)...")
     
-    # Create agents (will log agent creation)
-    crawl_agent = create_crawl_agent()
-    rag_agent = create_rag_agent()
+    # Create unified agent (will log agent creation)
+    unified_agent = create_unified_agent()
     
     print("🌐 Starting crawl workflow (check logfire for detailed execution traces)...")
     
     # Demonstrate crawling workflow with logging
     crawl_prompt = """
-    Please crawl the Python documentation homepage to gather information about Python features.
+    Please crawl the Python documentation homepage at https://docs.python.org to gather information about Python features.
     Use the smart crawling approach to get comprehensive content.
     """
     
@@ -75,7 +69,7 @@ async def demonstrate_logging_workflow():
         # - MCP tool executions (smart_crawl_url, etc.)
         # - Database operations (storage, embedding generation)
         # - Performance metrics
-        crawl_result = await run_agent_with_mcp(crawl_agent, crawl_prompt, crawl_deps)
+        crawl_result = await run_unified_agent(unified_agent, crawl_prompt, unified_deps)
         
         logger.info("Crawl workflow completed successfully", 
                    result_type=type(crawl_result).__name__,
@@ -108,7 +102,7 @@ async def demonstrate_logging_workflow():
         # - MCP tool executions (perform_rag_query, get_available_sources)
         # - Database operations (vector search, retrieval)
         # - Search performance metrics
-        rag_result = await run_agent_with_mcp(rag_agent, rag_prompt, rag_deps)
+        rag_result = await run_unified_agent(unified_agent, rag_prompt, unified_deps)
         
         logger.info("RAG workflow completed successfully", 
                    result_type=type(rag_result).__name__,
@@ -142,11 +136,11 @@ async def demonstrate_error_logging():
     print("\n🚨 Demonstrating error handling and logging...")
     
     # Test with invalid URL
-    crawl_agent = create_crawl_agent()
-    crawl_deps = CrawlDependencies(
-        server_url="http://localhost:8051/sse",
-        max_concurrent=1,
-        chunk_size=1000
+    unified_agent = create_unified_agent()
+    unified_deps = UnifiedAgentDependencies(
+        mcp_server_url="http://localhost:8051/sse",
+        default_max_concurrent=1,
+        default_chunk_size=1000
     )
     
     error_prompt = "Please crawl this invalid URL: https://this-domain-does-not-exist-12345.com"
@@ -156,7 +150,7 @@ async def demonstrate_error_logging():
                    test_type="error_demo", 
                    expected_outcome="failure")
         
-        result = await run_agent_with_mcp(crawl_agent, error_prompt, crawl_deps)
+        result = await run_unified_agent(unified_agent, error_prompt, unified_deps)
         print("🤔 Unexpected success - check logfire for details")
         
     except Exception as e:

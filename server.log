@@ -1,0 +1,112 @@
+🚀 Starting MCP Server...
+🌐 SSE server starting on http://localhost:8051/sse
+📋 Connect MCP Inspector to: http://localhost:8051/sse
+Warning: LOGFIRE_TOKEN not set, falling back to console logging
+2025-06-19 00:51:05,468 - crawl4ai-mcp - INFO - System startup (service=crawl4ai-mcp-server, version=0.1.0, environment=development)
+2025-06-19 00:51:05,468 - crawl4ai-mcp - INFO - Starting MCP server with sse transport
+INFO:     Started server process [35589]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8051 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56537 - "HEAD /sse HTTP/1.1" 200 OK
+ERROR:    Exception in ASGI application
+  + Exception Group Traceback (most recent call last):
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+  |     result = await app(  # type: ignore[func-returns-value]
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+  |     return await self.app(scope, receive, send)
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/applications.py", line 113, in __call__
+  |     await self.middleware_stack(scope, receive, send)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 187, in __call__
+  |     raise exc
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 165, in __call__
+  |     await self.app(scope, receive, _send)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+  |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+  |     raise exc
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+  |     await app(scope, receive, sender)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/routing.py", line 716, in __call__
+  |     await self.middleware_stack(scope, receive, send)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/routing.py", line 736, in app
+  |     await route.handle(scope, receive, send)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/routing.py", line 290, in handle
+  |     await self.app(scope, receive, send)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/routing.py", line 78, in app
+  |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+  |     raise exc
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+  |     await app(scope, receive, sender)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/starlette/routing.py", line 75, in app
+  |     response = await f(request)
+  |                ^^^^^^^^^^^^^^^^
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/mcp/server/fastmcp/server.py", line 716, in sse_endpoint
+  |     return await handle_sse(request.scope, request.receive, request._send)  # type: ignore[reportPrivateUsage]
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/mcp/server/fastmcp/server.py", line 649, in handle_sse
+  |     async with sse.connect_sse(
+  |   File "/Users/mg/.local/share/uv/python/cpython-3.12.0-macos-aarch64-none/lib/python3.12/contextlib.py", line 222, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/mcp/server/sse.py", line 138, in connect_sse
+  |     async with anyio.create_task_group() as tg:
+  |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 772, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/mcp/server/sse.py", line 157, in connect_sse
+    |     yield (read_stream, write_stream)
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/mcp/server/fastmcp/server.py", line 654, in handle_sse
+    |     await self._mcp_server.run(
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/mcp/server/lowlevel/server.py", line 474, in run
+    |     lifespan_context = await stack.enter_async_context(self.lifespan(self))
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/.local/share/uv/python/cpython-3.12.0-macos-aarch64-none/lib/python3.12/contextlib.py", line 647, in enter_async_context
+    |     result = await _enter(cm)
+    |              ^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/.local/share/uv/python/cpython-3.12.0-macos-aarch64-none/lib/python3.12/contextlib.py", line 204, in __aenter__
+    |     return await anext(self.gen)
+    |            ^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/mcp/server/fastmcp/server.py", line 127, in wrap
+    |     async with lifespan(app) as context:
+    |   File "/Users/mg/.local/share/uv/python/cpython-3.12.0-macos-aarch64-none/lib/python3.12/contextlib.py", line 204, in __aenter__
+    |     return await anext(self.gen)
+    |            ^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/src/crawl4ai_mcp.py", line 84, in crawl4ai_lifespan
+    |     postgres_pool = await create_postgres_pool()
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/src/utils.py", line 57, in create_postgres_pool
+    |     return await asyncpg.create_pool(database_url, min_size=2, max_size=10)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/asyncpg/pool.py", line 418, in _async__init__
+    |     await self._initialize()
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/asyncpg/pool.py", line 445, in _initialize
+    |     await first_ch.connect()
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/asyncpg/pool.py", line 132, in connect
+    |     self._con = await self._pool._get_new_connection()
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/asyncpg/pool.py", line 517, in _get_new_connection
+    |     con = await self._connect(
+    |           ^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/asyncpg/connection.py", line 2421, in connect
+    |     return await connect_utils._connect(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1049, in _connect
+    |     conn = await _connect_addr(
+    |            ^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 886, in _connect_addr
+    |     return await __connect_addr(params, True, *args)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/mg/Desktop/mcp-workspace/local-mcp-servers/mcp-crawl4ai-rag/crawl_venv/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 934, in __connect_addr
+    |     await connected
+    | asyncpg.exceptions.InvalidAuthorizationSpecificationError: role "$(whoami)" does not exist
+    +------------------------------------
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [35589]
+./start_mcp_server.sh: line 49: 35589 Terminated: 15          TRANSPORT=sse python src/crawl4ai_mcp.py

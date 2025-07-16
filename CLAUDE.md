@@ -1,681 +1,216 @@
-# CLAUDE.md - Project Documentation & AI Assistant Guide
+# CLAUDE.md
 
-## 🎯 Project Overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-### Mission Statement
-**Crawl4AI RAG MCP Server**: A production-ready Model Context Protocol server providing intelligent web crawling and RAG capabilities for AI agents and coding assistants, with PostgreSQL vector database integration and Pydantic AI agent orchestration.
+## Project Overview
+This is a production-ready Model Context Protocol (MCP) server that provides intelligent web crawling and RAG capabilities for AI agents and coding assistants. It integrates Crawl4AI for web scraping with PostgreSQL + pgvector for semantic search and provides 5 MCP tools for external AI agents.
 
-### Current Development Phase: 🟡 MAKE IT RIGHT
-**Phase 2 of 3**: Core functionality works perfectly, now optimizing architecture, code quality, and documentation standards.
+## Development Commands
 
-**Phase Progress:**
-- ✅ **PHASE 1: MAKE IT WORK** - Completed (Jan 2025)
-  - Core MCP server functionality
-  - Web crawling and RAG capabilities
-  - Database integration with PostgreSQL + pgvector
-  - Agent framework integration with Pydantic AI
-  - Production-ready performance (197 pages/42.5s, 856 chunks stored)
-
-- 🟡 **PHASE 2: MAKE IT RIGHT** - Current Phase
-  - 🔄 Architecture refactoring (single orchestrator agent - TASK-024)
-  - 🟡 Code quality improvements and standardization
-  - 🟡 Documentation restructuring and enhancement
-  - 🟡 Testing framework optimization
-
-- 🟢 **PHASE 3: MAKE IT FAST** - Future
-  - Performance optimization and scalability
-  - Advanced features and integrations
-  - Production deployment optimization
-
-### Key Objectives
-1. **Complete unified agent architecture** (replacing 3-agent approach)
-2. **Standardize code quality** across all modules
-3. **Optimize documentation** for maintainability
-4. **Enhance testing framework** for comprehensive coverage
-
-## 🚨 Emergency Protocols
-
-### Quick Context Loading
-**Start every session with:**
-1. **READ**: Current Tasks section (🔴🟡🟢 priorities)
-2. **CHECK**: Git status and recent commits
-3. **VERIFY**: Development phase requirements
-4. **UPDATE**: Documentation as you work (not after)
-
-### Critical Commands
+### Environment Setup
 ```bash
-# Emergency status check
-git status && git log --oneline -5
-
-# Quick server verification
-./start_mcp_server.sh && curl -X POST "http://localhost:8051/tools/get_available_sources"
-
-# Database health check
-psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"
-```
-
-### Quality Gates (Non-negotiable)
-- **🔴 Critical**: Tests (3+ cases: happy/edge/failure)
-- **🔴 Critical**: Code (<500 lines, complete type hints)
-- **🔴 Critical**: Documentation (atomic updates to CLAUDE.md)
-- **🔴 Critical**: Git workflow (commit after every completed task)
-
-### Living Documentation Protocol
-**Documentation is not optional - it's core to every task.**
-- **Atomic Updates**: Document each change as you make it
-- **Context Preservation**: Explain WHY, not just WHAT
-- **Future Self Test**: Write as if you'll forget everything in 6 months
-- **Undocumented code/features are considered incomplete**
-
-## 🏗️ Technical Architecture
-
-### Core Technology Stack
-- **Language:** Python 3.12+ with UV package manager
-- **MCP Framework:** FastMCP for Model Context Protocol server implementation
-- **Web Crawling:** Crawl4AI with AsyncWebCrawler for intelligent content extraction
-- **Database:** PostgreSQL 17 + pgvector extension for vector storage and semantic search
-- **AI/ML:** OpenAI API (text-embedding-3-small, GPT-4.1) for embeddings and LLM processing
-- **Agent Framework:** Pydantic AI for intelligent agent orchestration with MCP integration
-- **Observability:** Logfire for comprehensive logging and performance monitoring
-- **Key Dependencies:** crawl4ai, mcp, asyncpg, openai, sentence-transformers, pydantic-ai[logfire]
-
-<project_architecture>
-## Project Architecture
-
-### Overview
-This is a Model Context Protocol (MCP) server that provides web crawling and RAG (Retrieval Augmented Generation) capabilities for AI agents and coding assistants. It integrates Crawl4AI for intelligent web scraping with PostgreSQL vector database for semantic search and retrieval.
-
-### Key Components
-
-#### Core MCP Server (`src/crawl4ai_mcp.py`)
-- **FastMCP Server**: Main server implementing MCP protocol with SSE/stdio transport
-- **Lifespan Management**: Handles AsyncWebCrawler and PostgreSQL pool initialization
-- **MCP Tools**: Implements 5 core tools for crawling and searching content
-
-#### Crawl4AI Integration (Web Content Acquisition Layer)
-- **Role**: Purely handles web crawling and content extraction
-- **Capabilities**: 
-  - Converts HTML to clean markdown using headless browser (Chrome/Chromium)
-  - Handles JavaScript-heavy sites with dynamic content rendering
-  - Extracts structured data (links, headers, code blocks)
-  - Manages parallel processing with memory-adaptive dispatcher
-  - Provides three crawling strategies: single page, batch, and recursive
-- **Output**: Clean markdown content that feeds into custom RAG processing
-- **Note**: Crawl4AI does NOT handle embedding, chunking, or database operations
-
-#### Utility Layer (`src/utils.py`) - Custom RAG Processing
-- **Database Operations**: PostgreSQL connection handling and vector operations
-- **Embedding Generation**: OpenAI API integration for text embeddings (text-embedding-3-small)
-- **Content Processing**: Smart chunking (respects code blocks), contextual embeddings, and code extraction
-
-#### Database Schema (`crawled_pages.sql`)
-- **Vector Search**: PostgreSQL with pgvector for semantic similarity search
-- **Hybrid Search**: Combines vector and keyword search capabilities
-- **Source Management**: Tracks crawled sources with summaries and metadata
-
-### Architecture Decisions
-
-#### MCP Protocol Implementation
-- Uses FastMCP framework for clean tool-based architecture
-- Implements both SSE (HTTP) and stdio transports for flexibility
-- Context management pattern for sharing crawler and database connections
-
-#### Advanced RAG Strategies (Configurable)
-- **Contextual Embeddings**: Enhances chunks with document context for better retrieval
-- **Hybrid Search**: Combines semantic vector search with keyword matching
-- **Agentic RAG**: Specialized code example extraction and storage
-- **Reranking**: Cross-encoder models for result relevance improvement
-
-#### Crawling Intelligence
-- **Smart URL Detection**: Automatically handles sitemaps, text files, and webpages
-- **Recursive Crawling**: Follows internal links with configurable depth
-- **Parallel Processing**: Memory-adaptive dispatcher for concurrent crawling
-
-### Data Flow
-
-#### Complete Processing Pipeline
-1. **URL Input** → Smart detection (sitemap/txt/webpage)
-2. **Crawl4AI Processing** → Web crawling and HTML-to-markdown conversion
-3. **Custom Content Processing** → Smart chunking (respects code blocks), metadata extraction
-4. **Custom Embedding** → OpenAI API (text-embedding-3-small) with optional contextual enhancement
-5. **Custom Storage** → PostgreSQL with vector indices via custom database operations
-6. **Custom Retrieval** → Vector similarity search + optional hybrid/reranking
-
-#### Clear Separation of Responsibilities
-- **Crawl4AI**: Web content acquisition (HTML → clean markdown)
-- **Custom Code**: All RAG intelligence (chunking, embedding, storage, retrieval)
-
-### Current System Status (Updated 2025-01-15)
-
-#### Operational Services
-- **PostgreSQL@17**: Running with pgvector extension enabled
-- **Database**: `crawl4ai_rag` initialized with complete schema (sources, crawled_pages, code_examples tables)
-- **MCP Server**: Running on http://localhost:8051/sse
-- **SSE Endpoint**: Responding with proper event streams
-- **Virtual Environment**: `crawl_venv` with all dependencies installed
-
-#### Agent Testing Status (2025-01-15)
-- **CLI Interface**: Functional after import fixes, initializes successfully
-- **Model Configuration**: All agents updated to GPT-4 Turbo (gpt-4-turbo)
-- **Import System**: Resolved relative import issues with fallback mechanisms
-- **Known Issues**: Runtime errors during agent execution requiring investigation (TASK-025)
-- **Testing Priority**: Debug agent execution failures before production deployment
-
-#### Pydantic AI Agent Status - UNIFIED ARCHITECTURE IMPLEMENTED
-- **Previous Architecture (Deprecated)**: Three separate agents (crawl, rag, workflow) - Replaced
-- **New Architecture (Production Ready)**: Single intelligent orchestrator agent with GPT-4.1 integration
-- **Agent Design Philosophy**: One agent that intelligently selects from 5 MCP tools based on user intent
-- **MCP Tool Integration**: Direct access to all 5 tools with intelligent selection logic
-- **Structured Outputs**: Unified response models with comprehensive result synthesis
-- **Enhanced Tool Descriptions**: Improved with USE WHEN/DON'T USE guidance and workflow patterns
-- **Model Configuration**: All agents now use GPT-4 Turbo (gpt-4-turbo) for optimal performance and cost efficiency
-- **Import Architecture**: Fixed relative import issues in pydantic_agent module for cross-context compatibility
-
-#### Recent Key Fixes (All Resolved)
-- ✅ **Vector Embedding Format**: PostgreSQL vector compatibility fixed (TASK-017)
-- ✅ **Function Naming Conflicts**: MCP tool execution reliability improved (TASK-018)
-- ✅ **Startup Performance**: 90% faster server initialization (TASK-015, TASK-016)
-- ✅ **Pydantic AI Integration**: Complete agent framework integration (TASK-020)
-- ✅ **Testing Results**: Production-ready performance verified (TASK-021)
-- ✅ **Logfire Integration**: Comprehensive logging for MCP server and Pydantic AI agents (TASK-023)
-- ✅ **Architecture Refactoring**: Single orchestrator agent with GPT-4.1 integration completed (TASK-024)
-- ✅ **Import System**: Fixed relative import issues in pydantic_agent module (TASK-024)
-- ✅ **Model Configuration**: Standardized all agents to use GPT-4 Turbo for consistency (TASK-024)
-
-### New Architecture: Single Intelligent Orchestrator
-
-#### Design Philosophy (Following MCP Best Practices)
-- **One Agent, Five Tools**: Single agent intelligently selects from 5 MCP tools based on user intent
-- **Intent-Driven Tool Selection**: Agent analyzes user queries to determine optimal workflow patterns
-- **Workflow Orchestration**: Automated multi-step processes with context management
-- **Enhanced User Experience**: No agent selection needed - natural language interaction
-
-#### Tool Selection Logic
-**Research Workflow** (URLs mentioned):
-1. `smart_crawl_url` → Gather new content
-2. `get_available_sources` → Confirm storage  
-3. `perform_rag_query` → Answer questions about crawled content
-
-**Search Workflow** (questions about topics):
-1. `get_available_sources` → Check available content
-2. `perform_rag_query` → Find relevant information
-3. `search_code_examples` → If code specifically requested
-
-**Discovery Workflow** (content exploration):
-1. `get_available_sources` → List what's available
-2. Optional follow-up searches based on user interest
-
-#### Enhanced Tool Descriptions
-- **USE WHEN/DON'T USE** guidance for clear tool boundaries
-- **Workflow patterns** showing tool dependencies and sequences  
-- **Concrete examples** with parameter demonstrations
-- **Error scenarios** for robust error handling
-
-#### Implementation Components
-- `src/pydantic_agent/unified_agent.py` - Single orchestrator agent (GPT-4 Turbo configured)
-- `cli_chat.py` - Interactive CLI interface with rich formatting (functional, import issues resolved)
-- `src/pydantic_agent/examples/unified_agent_example.py` - Comprehensive demonstrations (GPT-4 Turbo)
-- `src/pydantic_agent/agent.py` - Legacy agent implementations (updated to GPT-4 Turbo)
-- Enhanced MCP tool descriptions in `src/crawl4ai_mcp.py`
-- Fixed import system with fallback mechanisms for cross-context compatibility
-
-### Technical Implementation Details
-
-#### Model Configuration (Updated 2025-01-15)
-- **Primary Model**: GPT-4 Turbo (gpt-4-turbo) across all agent implementations
-- **Rationale**: Optimal balance of performance, cost efficiency, and availability
-- **Previous Models**: Migrated from o3 (unavailable) and gpt-4o to gpt-4-turbo
-- **Consistency**: All agents (unified, crawl, rag, workflow) use same model for predictable behavior
-
-#### Import System Architecture (Fixed 2025-01-15)
-- **Problem**: Relative imports in pydantic_agent module failed when running CLI directly
-- **Solution**: Implemented fallback import mechanism with path manipulation
-- **Pattern**: Try relative imports first, fallback to absolute imports with sys.path adjustment
-- **Files Updated**: `agent.py`, `unified_agent.py` with robust import handling
-- **Result**: CLI interface (`cli_chat.py`) now functional across different execution contexts
-
-### External Dependencies
-
-#### Critical Services
-- **OpenAI API**: Embeddings (text-embedding-3-small) and LLM processing (GPT-4 Turbo)
-- **PostgreSQL**: Primary database with pgvector extension for vector operations
-
-#### Optional Enhancements
-- **Cross-encoder Models**: For reranking (runs locally, CPU-based)
-
-### Observability & Logging
-
-#### Standard Logfire Integration - PRODUCTION READY (Updated 2025-01-15)
-- **Pydantic AI Built-in Instrumentation**: Uses `logfire.instrument_pydantic_ai()` for automatic agent tracing
-- **HTTP Request Monitoring**: `logfire.instrument_httpx()` captures raw prompts and responses
-- **MCP Tool Execution Logging**: Simple `@log_mcp_tool_execution` decorator with basic metrics
-- **Error Tracking**: Structured error logging with context and timing information
-- **Dashboard Integration**: Real-time traces in Logfire dashboard with automatic configuration
-
-#### Simple Logging Architecture
-- **Standard Instrumentation**: Uses Pydantic AI's built-in Logfire support instead of custom decorators
-- **Basic MCP Tool Logging**: `@log_mcp_tool_execution` with execution time, success/failure, and result summaries
-- **Automatic Agent Tracing**: Pydantic AI automatically creates spans for agent runs and tool calls
-- **HTTP Visibility**: Raw OpenAI API requests/responses visible in Logfire for debugging
-- **Clean Error Handling**: Simple error logging without complex categorization
-
-#### Observability Components
-- **Logging Configuration**: `src/logging_config.py` - Simple MCP tool logging with basic metrics
-- **Agent Setup**: `setup_logfire_instrumentation()` in unified agent for automatic configuration
-- **CLI Integration**: Automatic Logfire setup on startup with dashboard link display
-- **Standard Patterns**: Uses Logfire's recommended instrumentation patterns
-
-#### Logfire Dashboard Features
-- **Agent Execution Traces**: Complete agent runs with nested tool calls and timing
-- **HTTP Request Details**: Raw prompts, responses, and token usage from OpenAI API
-- **MCP Tool Performance**: Execution times, success rates, and result summaries
-- **Error Tracking**: Exception details with stack traces and context
-- **Real-time Monitoring**: Live traces during agent execution
-- **Dashboard URL**: https://logfire-eu.pydantic.dev/matzls/crawl4ai-agent
-</project_architecture>
-
-## 📋 Task Management
-
-### 🔴 Critical Priority (Blocking/High Risk)
-**Active Tasks - Immediate Action Required**
-- *No critical blocking tasks currently active*
-
-### 🟡 Important Priority (Medium Risk)
-**MAKE IT RIGHT Phase Tasks**
-- [ ] **TASK-025**: Implement Context 7-inspired chunking strategy
-  - **Phase**: Code quality improvement
-  - **Risk**: Performance impact if delayed
-- [ ] **TASK-026**: Performance optimization for crawling speed
-  - **Phase**: Architecture optimization
-  - **Risk**: Scalability limitations
-- [ ] **TASK-028**: Enhanced configuration management for RAG strategies
-  - **Phase**: Code standardization
-  - **Risk**: Maintenance complexity
-- [ ] **TASK-031**: Investigate and resolve agent testing runtime errors
-  - **Phase**: Quality assurance
-  - **Risk**: Testing reliability issues
-
-### 🟢 Nice-to-Have Priority (Low Risk)
-**MAKE IT FAST Phase Tasks (Future)**
-- [ ] **TASK-027**: Integration with Archon knowledge engine
-  - **Phase**: Advanced features
-  - **Risk**: Low - enhancement only
-- [ ] **TASK-029**: Add support for multiple embedding models (Ollama integration)
-  - **Phase**: Feature expansion
-  - **Risk**: Low - optional capability
-
-### ✅ Recently Completed (MAKE IT WORK → MAKE IT RIGHT Transition)
-**Phase 2 Progress (Jan 2025)**
-- [x] **TASK-024**: Complete unified agent architecture implementation with GPT-4.1 integration and import fixes (2025-01-15)
-- [x] **TASK-030**: Comprehensive CLAUDE.md restructuring with three-phase development model (2025-01-15)
-- [x] **TASK-032**: Implement simplified observability using Pydantic AI's built-in Logfire integration (2025-01-15)
-
-**Phase 1 Completion (Jan 2025)**
-- [x] **TASK-020**: Pydantic AI agent integration with MCP server (2025-01-13)
-- [x] **TASK-021**: Complete end-to-end testing and verification (2025-01-13)
-- [x] **TASK-023**: Comprehensive logfire logging implementation (2025-01-13)
-- [x] **TASK-017**: Fix PostgreSQL vector embedding format issue (2025-01-13)
-- [x] **TASK-018**: Fix function naming conflicts (2025-01-13)
-- [x] **TASK-015/016**: Optimize startup performance (90% improvement) (2025-01-13)
-
-**Foundation Tasks (Jan 2025)**
-- [x] **TASK-MIGRATE-001**: Migrate from Supabase to PostgreSQL (2025-01-08)
-- [x] **TASK-001**: Document project architecture in CLAUDE.md (2025-01-08)
-- [x] **TASK-009**: Comprehensive end-to-end testing plan (2025-01-08)
-- [x] **TASK-010**: PostgreSQL 17 configuration documentation (2025-01-08)
-- [x] **TASK-014**: Consolidate virtual environments (2025-01-13)
-- [x] **TASK-022**: Streamline CLAUDE.md documentation (2025-01-13)
-
-### Task Management Protocol
-- **Task IDs**: Sequential numbering (TASK-001, TASK-002, etc.)
-- **Risk Classification**: 🔴🟡🟢 system for priority management
-- **Phase Alignment**: Tasks mapped to three-phase development model
-- **Commit References**: All commits must include task ID
-- **Completion Tracking**: Date and acceptance criteria verification
-
-## 📏 Quality Standards
-
-### Phase-Specific Code Quality Requirements
-
-#### 🟡 MAKE IT RIGHT Phase Standards (Current)
-**Code Organization**
-- **File size**: <500 lines per file, split when approaching limit
-- **Functions**: <50 lines, methods <30 lines, max 3 levels nesting
-- **Type hints**: Complete for all functions, methods, attributes
-- **Error handling**: Specific exception types with structured logging
-- **Testing**: 3+ cases per feature (happy/edge/failure paths)
-
-**Architecture Standards**
-- **Single Responsibility**: Each module has one clear purpose
-- **Dependency Injection**: Use Pydantic AI dependency patterns
-- **MCP Integration**: Follow FastMCP best practices
-- **Database Operations**: Async patterns with proper connection pooling
-
-#### Import Organization (Enforced)
-```python
-# Standard library
-import os
-from typing import List, Optional
-
-# Third-party
-import pydantic
-from fastapi import FastAPI
-
-# Local application
-from .models import User
-from ..core import config
-```
-
-#### Documentation Standards (Non-negotiable)
-- **Google-style docstrings** for all public functions, classes, methods
-- **Inline comments** explaining "why" for complex logic
-- **CLAUDE.md updates** for all architectural changes
-- **TODO comments** only with task IDs and deadlines
-- **Framework verification** for all external library usage
-
-### Quality Assurance Process
-
-#### Pre-commit Requirements
-- **Ruff formatting**: Code style consistency
-- **Type checking**: mypy validation
-- **Test execution**: All tests must pass
-- **Documentation sync**: CLAUDE.md must be updated
-
-#### Code Review Checklist
-- [ ] Follows phase-specific standards
-- [ ] Complete type hints and docstrings
-- [ ] Error handling with proper logging
-- [ ] Tests cover happy/edge/failure cases
-- [ ] Documentation updated atomically
-- [ ] No TODO comments without task IDs
-
-## 🧪 Quality Assurance
-
-### Testing Framework (Phase-Aligned)
-
-#### 🟡 MAKE IT RIGHT Phase Testing (Current Focus)
-**Test Structure Standards**
-- **Mirror app structure** in `/tests` directory
-- **AAA pattern**: Arrange-Act-Assert for clarity
-- **Mock external dependencies** (APIs, databases, MCP servers)
-- **Coverage targets**: >80% for production code, >60% for prototypes
-
-**Critical Test Scenarios**
-- **🔴 Unified Agent Architecture**: Single orchestrator with intelligent tool selection
-- **🔴 MCP Tool Integration**: All 5 tools with proper error handling
-  - `crawl_single_page`, `smart_crawl_url`, `get_available_sources`
-  - `perform_rag_query`, `search_code_examples`
-- **🟡 Workflow Orchestration**: Intent analysis and multi-step coordination
-  - Research workflow (crawl→search), Search-only, Code-focused, Discovery
-- **🟡 Database Operations**: Vector storage, retrieval, and connection pooling
-- **🟡 Error Handling**: Invalid inputs, API failures, graceful degradation
-- **🟢 RAG Strategies**: Contextual embeddings, hybrid search, reranking
-
-#### Framework Verification Patterns
-**External Library Integration Testing**
-- **Pydantic AI**: Agent creation, MCP server integration, dependency injection
-- **FastMCP**: Tool registration, context management, transport protocols
-- **Crawl4AI**: Web crawling, content extraction, parallel processing
-- **PostgreSQL**: Vector operations, connection pooling, query performance
-- **OpenAI API**: Embedding generation, rate limiting, error handling
-
-#### Test Execution Strategy
-```bash
-# Phase-specific test execution
-pytest tests/ -v --cov=src --cov-report=html
-
-# Critical path testing (🔴 priority)
-pytest tests/test_unified_agent.py tests/test_mcp_tools.py -v
-
-# Integration testing (🟡 priority)
-pytest tests/test_workflows.py tests/test_database.py -v
-
-# Performance testing (🟢 priority)
-pytest tests/test_performance.py -v --benchmark-only
-```
-
-## 🛠️ Development Workflows
-
-### Phase-Based Development Commands
-
-#### 🟡 MAKE IT RIGHT Phase Workflows (Current)
-
-**Environment Setup & Verification**
-```bash
-# Initial setup (one-time)
+# Create and activate virtual environment
 uv venv crawl_venv && source crawl_venv/bin/activate
 uv pip install -e .
 crawl4ai-setup
 
-# Database setup (PostgreSQL 17 + pgvector)
+# Database setup (PostgreSQL 17 + pgvector required)
 brew install postgresql@17 pgvector
 brew services start postgresql@17
 createdb crawl4ai_rag
 psql -h localhost -U $(whoami) -d crawl4ai_rag -f crawled_pages.sql
-
-# Verify environment health
-python -c "from src.utils import create_postgres_pool; import asyncio; asyncio.run(create_postgres_pool())"
 ```
 
-**Development Server Management**
+### Running the Server
 ```bash
-# Start MCP server (SSE transport - default)
+# Quick startup (recommended - 90% faster)
 ./start_mcp_server.sh
 
-# Alternative transport modes
-TRANSPORT=stdio ./start_mcp_server.sh
+# Manual startup
+python src/crawl4ai_mcp.py
 
-# Connect MCP Inspector for debugging
+# Using uv
+uv run src/crawl4ai_mcp.py
+```
+
+### Testing Commands
+```bash
+# Run all tests with coverage
+pytest tests/ -v --cov=src --cov-report=term-missing
+
+# Fast unit tests (recommended for development)
+pytest tests/unit/test_content_processor.py -v --cov=src/content
+
+# Test specific module with coverage report
+pytest tests/unit/ -v --cov=src --cov-report=html
+
+# Quick test validation
+pytest tests/unit/test_content_processor.py -q
+```
+
+### Code Quality
+```bash
+# Format and lint code
+ruff format src/ tests/ && ruff check src/ tests/
+
+# Type checking
+mypy src/
+
+# MCP tool testing with MCP Inspector
 npx @modelcontextprotocol/inspector
 # Connect to: http://localhost:8051/sse
 ```
 
-**Quality Assurance Workflows**
+### Interactive Testing
 ```bash
-# Code quality checks
-ruff check src/ tests/
-ruff format src/ tests/
-mypy src/
-
-# Testing workflows (phase-aligned)
-pytest tests/ -v --cov=src --cov-report=html  # Full test suite
-pytest tests/test_unified_agent.py -v         # Critical path (🔴)
-pytest tests/test_workflows.py -v             # Integration (🟡)
-
-# Performance monitoring and testing
-python test_logging.py                        # Logging verification
-python src/pydantic_agent/examples/logging_example.py  # Comprehensive demo
-
-# Database monitoring
-psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"
-
-# Agent architecture testing (GPT-4.1 configured)
-python src/pydantic_agent/examples/unified_agent_example.py  # Unified orchestrator
-python src/pydantic_agent/examples/basic_crawl_example.py    # Individual components
-python src/pydantic_agent/examples/rag_workflow_example.py   # Workflow testing
-
-# Interactive CLI interface with Logfire observability
+# Interactive CLI with unified agent
 python cli_chat.py
+
+# Database browser (custom tool)
+python db_browser.py
 ```
 
-**Development & Debugging Tools**
+## Architecture Overview
+
+### Core Components
+- **`src/mcp_server.py`** - FastMCP server with SSE/stdio transport and lifespan management
+- **`src/mcp_crawl_tools.py`** - Crawling tools (`crawl_single_page`, `smart_crawl_url`)
+- **`src/mcp_search_tools.py`** - Search tools (`get_available_sources`, `perform_rag_query`, `search_code_examples`)
+- **`src/crawl_strategies.py`** - URL detection and parallel processing strategies
+- **`src/content_processing.py`** - Smart chunking and metadata extraction
+- **`src/pydantic_agent/unified_agent.py`** - Single orchestrator agent for testing
+
+### Modular Architecture
+The project was refactored from a 1,121-line monolith into focused modules. Each file is <500 lines following the codebase standards. The main entry point `src/crawl4ai_mcp.py` imports from all modules for backward compatibility.
+
+### Database Schema
+PostgreSQL 17 with pgvector extension. Key tables:
+- **`sources`** - Crawled source metadata with AI-generated summaries
+- **`crawled_pages`** - Content chunks with vector embeddings for semantic search
+- **`code_examples`** - Extracted code examples with AI summaries (if `USE_AGENTIC_RAG=true`)
+
+### MCP Tools Provided
+1. **`crawl_single_page(url)`** - Quick single page crawl and storage
+2. **`smart_crawl_url(url, max_depth, max_concurrent, chunk_size)`** - Intelligent multi-page crawling with sitemap/txt detection
+3. **`get_available_sources()`** - List crawled sources for discovery
+4. **`perform_rag_query(query, source, match_count)`** - Semantic search with optional hybrid search and reranking
+5. **`search_code_examples(query, source_id, match_count)`** - Code-specific search (when `USE_AGENTIC_RAG=true`)
+
+## Environment Configuration
+
+### Required Environment Variables
 ```bash
-# System health checks
-curl -X POST "http://localhost:8051/tools/get_available_sources"  # MCP server
-psql -h localhost -U $(whoami) -d crawl4ai_rag -c "SELECT COUNT(*) FROM crawled_pages;"  # Database
+# Core configuration
+OPENAI_API_KEY=your_openai_api_key
+DATABASE_URL=postgresql://user:pass@localhost/crawl4ai_rag
 
-# Interactive development
-python cli_chat.py                            # CLI interface
-python src/pydantic_agent/examples/unified_agent_example.py  # Agent testing
+# Server configuration
+HOST=0.0.0.0
+PORT=8051
+TRANSPORT=sse
 
-# Architecture verification
-python src/pydantic_agent/examples/unified_agent_example.py  # Single orchestrator testing
+# Optional RAG enhancements
+USE_CONTEXTUAL_EMBEDDINGS=false
+USE_HYBRID_SEARCH=false
+USE_AGENTIC_RAG=false
+USE_RERANKING=false
 ```
 
-#### 🟢 MAKE IT FAST Phase Workflows (Future)
-```bash
-# Performance profiling (future phase)
-pytest tests/test_performance.py --benchmark-only
-python -m cProfile -o profile.stats src/crawl4ai_mcp.py
+### RAG Strategy Options
+- **USE_CONTEXTUAL_EMBEDDINGS** - Enriches chunks with document context via LLM
+- **USE_HYBRID_SEARCH** - Combines vector + keyword search
+- **USE_AGENTIC_RAG** - Extracts and summarizes code examples (enables `search_code_examples` tool)
+- **USE_RERANKING** - Cross-encoder reranking for better result ordering
 
-# Load testing (future phase)
-locust -f tests/load_test.py --host=http://localhost:8051
-```
+## Testing Infrastructure
 
-## 🤖 AI Assistant Guidelines
+### Testing Architecture
+Production-ready testing with centralized mocking in `tests/conftest.py`:
+- **Auto-mocking** of OpenAI API and PostgreSQL operations
+- **Zero external dependencies** during unit testing
+- **Sub-second execution** (28 tests in <1 second)
+- **97% coverage** achieved on content processor module
 
-### Context Management Protocol
-- **Never assume missing context** - ask for clarification when requirements unclear
-- **Framework verification first** - check latest documentation for API changes
-- **Only use approved libraries** or discuss new dependencies with user
-- **Never delete existing code** without explicit instruction and backup
-- **Phase-aware development** - align all work with current MAKE IT RIGHT phase
+### Key Testing Files
+- **`tests/conftest.py`** - Centralized mock configuration with auto-applied fixtures
+- **`tests/unit/test_content_processor.py`** - Content processing tests (97% coverage)
+- **`tests/unit/test_mcp_tools.py`** - MCP tool functionality tests
+- **`pytest.ini`** - Comprehensive pytest configuration with asyncio support
 
-### Git Integration Requirements (Non-negotiable)
-- **Commit after every completed task** using conventional commit format
-- **Include task IDs in commit messages** for traceability (e.g., "feat(agent): implement unified orchestrator - TASK-024")
-- **Update CLAUDE.md AS YOU WORK** (not after completion)
-- **Risk-based branching** - 🔴 tasks require feature branches, 🟡🟢 can use main
+## Development Patterns
 
-### MCP Tools Implementation Standards
-**Core Patterns (Enforced)**
-- **All tools are async** - use `async def` with `@mcp.tool()` decorator
-- **Context Access** - get lifespan context via `ctx.request_context.lifespan_context`
-- **Error Handling** - return structured JSON with success/error fields, never raise exceptions
-- **Type Safety** - complete type hints for all parameters and return values
-- **Logging Integration** - use `@log_mcp_tool_execution` decorator for observability
-
-**Available MCP Tools (Production)**
-1. **`crawl_single_page(url: str)`** - Quick single page crawl and storage
-2. **`smart_crawl_url(url: str, max_depth: int = 3, max_concurrent: int = 10)`** - Intelligent crawling with URL detection
-3. **`get_available_sources()`** - List all crawled sources for filtering and discovery
-4. **`perform_rag_query(query: str, source: str = None, match_count: int = 5)`** - Semantic search with source filtering
-5. **`search_code_examples(query: str, source_id: str = None, match_count: int = 5)`** - Code-specific search (requires USE_AGENTIC_RAG=true)
-
-### Project-Specific Implementation Rules
-**Architecture Constraints**
-- **Single Orchestrator Pattern** - one agent intelligently selects from 5 MCP tools (TASK-024)
-- **Environment Configuration** - RAG strategies toggle via environment variables
-- **Database Schema** - run migrations on crawled_pages.sql for schema changes
-- **Embedding Models** - currently hardcoded to text-embedding-3-small (OpenAI)
-- **Memory Management** - use memory-adaptive dispatcher for large crawl operations
-
-**Framework Verification Requirements**
-- **Pydantic AI**: Verify agent patterns, dependency injection, MCP integration
-- **FastMCP**: Check tool registration, context management, transport protocols
-- **Crawl4AI**: Validate crawling strategies, content extraction, parallel processing
-- **PostgreSQL/pgvector**: Confirm vector operations, indexing, query optimization
-
-## 📤 Deliverable Standards
-
-### Required Output Format (Phase-Aligned)
-
-**🟡 MAKE IT RIGHT Phase Requirements:**
-
-#### 1. Executive Summary
-- **Brief overview** of changes implemented
-- **Phase alignment** - how changes support MAKE IT RIGHT objectives
-- **Risk assessment** - 🔴🟡🟢 classification of changes made
-
-#### 2. Code Implementation
+### MCP Tool Development
 ```python
-# Complete, production-ready code with:
-# - Google-style docstrings
-# - Complete type hints
-# - Error handling with structured logging
-# - Framework verification comments
+from mcp import mcp
+from mcp.server.fastmcp import Context
+
+@mcp.tool()
+async def your_tool(ctx: Context, param: str) -> dict:
+    """Tool description for AI agents."""
+    # Access shared resources via context
+    crawler = ctx.request_context.lifespan_context["crawler"]
+    postgres_pool = ctx.request_context.lifespan_context["postgres_pool"]
+    
+    # Implement tool logic
+    result = await your_logic(param, crawler, postgres_pool)
+    
+    return {"success": True, "result": result}
 ```
 
-#### 3. Test Coverage
-```python
-# tests/test_feature.py - Complete Pytest implementation
-# - Happy path, edge cases, failure scenarios
-# - Mock external dependencies
-# - Framework integration testing
-```
+### Testing Patterns
+All external dependencies are auto-mocked globally. Tests are fast, isolated, and include happy path, edge cases, and error scenarios.
 
-#### 4. Documentation Updates (Atomic)
-```markdown
-## CLAUDE.MD Updates (Required)
-### Task Management Section
-- [x] TASK-XXX completed (YYYY-MM-DD) with acceptance criteria met
+### File Organization
+- Keep modules <500 lines
+- Separate concerns (crawling, search, content processing, database operations)
+- Use clear imports and `__all__` exports
+- Follow async/await patterns throughout
 
-### Technical Architecture Section (if applicable)
-- Updated architectural decisions with rationale
-- Framework verification notes
-- Performance impact assessment
-```
+## Key Integration Points
 
-#### 5. Quality Assurance Checklist
-**Code Quality (🔴 Critical)**
-- [ ] File size <500 lines, functions <50 lines
-- [ ] Complete type hints and docstrings
-- [ ] Error handling with structured logging
-- [ ] Ruff formatting applied
+### High-Risk Areas
+- **OpenAI API** - Rate limits and embedding generation (production validated: 197 pages/42.5s)
+- **PostgreSQL Vector Operations** - Large-scale storage and retrieval (validated: 856 chunks)
+- **MCP Protocol Compliance** - SSE/stdio transport stability (all 5 tools verified)
 
-**Testing (🔴 Critical)**
-- [ ] 3+ test cases (happy/edge/failure)
-- [ ] All tests passing
-- [ ] Coverage targets met (>80% production)
-- [ ] Framework integration verified
+### External Dependencies
+- **crawl4ai==0.6.2** - Web crawling with JavaScript rendering
+- **mcp>=1.9.4** - Official MCP Python SDK
+- **asyncpg==0.30.0** - PostgreSQL async driver
+- **openai>=1.86.0** - OpenAI API integration
+- **pydantic-ai[logfire]>=0.2.18** - Agent framework with observability
 
-**Documentation (🔴 Critical)**
-- [ ] CLAUDE.md updated atomically
-- [ ] Architectural changes documented
-- [ ] Framework verification completed
-- [ ] Task status updated with completion date
+## Common Tasks
 
-#### 6. Git Workflow Verification
-- **Conventional commits**: feat/fix/docs(scope): description - TASK-ID
-- **Branch strategy**: Feature branch for 🔴 tasks, main for 🟡🟢
-- **Repository status**: Clean working tree after completion
+### Adding New MCP Tools
+1. Create tool function in appropriate module (`mcp_crawl_tools.py` or `mcp_search_tools.py`)
+2. Add `@mcp.tool()` decorator and proper docstring
+3. Add comprehensive tests with mocking
+4. Update `crawl4ai_mcp.py` imports for backward compatibility
 
----
+### Database Operations
+- Use `utils.py` functions for database operations
+- All operations are async with proper connection pooling
+- Vector operations use pgvector extension
+- Always handle PostgreSQL connection errors gracefully
 
-### Framework Verification Protocol
-**Before implementing any external library integration:**
-1. **Check latest documentation** for API changes
-2. **Verify compatibility** with current dependencies
-3. **Test integration patterns** with minimal examples
-4. **Document findings** in Technical Architecture section
+### Testing New Features
+1. Write unit tests in `tests/unit/`
+2. Use existing mocking patterns from `conftest.py`
+3. Ensure tests run in <1 second
+4. Aim for >90% coverage on critical modules
+5. Test both happy path and error scenarios
 
-**Remember: Every code change MUST include corresponding documentation updates. Undocumented changes are considered incomplete regardless of functionality.**
+## Troubleshooting
 
----
+### Common Issues
+- **Database connection errors** - Verify PostgreSQL is running and `crawl4ai_rag` database exists
+- **Test timeouts** - Ensure auto-mocking is working (should run in <1s)
+- **MCP tool failures** - Test with MCP Inspector at `http://localhost:8051/sse`
+- **Startup issues** - Use `./start_mcp_server.sh` for optimized startup
 
-## 📊 Project Status Dashboard
-
-### Current Phase Status: 🟡 MAKE IT RIGHT
-**Last Updated**: 2025-01-15
-
-#### Phase Completion Metrics
-- **✅ MAKE IT WORK**: 100% Complete (Jan 2025)
-  - Core functionality: Production-ready
-  - Performance: 197 pages/42.5s, 856 chunks stored
-  - Integration: All systems operational
-
-- **🟡 MAKE IT RIGHT**: 90% Complete (In Progress)
-  - Architecture refactoring: ✅ TASK-024 completed (unified agent with GPT-4.1)
-  - Code quality: Standards implemented
-  - Documentation: ✅ Restructured (TASK-030 completed)
-  - Testing framework: Enhanced and aligned
-
-- **🟢 MAKE IT FAST**: 0% Complete (Future Phase)
-  - Performance optimization: Planned
-  - Advanced features: Backlog ready
-  - Production deployment: Future scope
-
-#### Risk Assessment Summary
-- **🔴 Critical Risks**: 0 active (all blocking tasks completed)
-- **🟡 Medium Risks**: 4 planned (chunking, performance, configuration, testing)
-- **🟢 Low Risks**: 2 future (integrations, model support)
-
-#### Next Actions
-1. **Begin TASK-025** - Context 7-inspired chunking strategy
-2. **Address TASK-031** - Resolve agent testing runtime errors
-3. **Implement TASK-026** - Performance optimization for crawling speed
-4. **Plan transition to MAKE IT FAST phase** (approaching 100% completion)
-
----
-
-*This documentation follows the three-phase development model with risk-based task prioritization. All changes are tracked atomically with task IDs and phase alignment.*
+### Performance Notes
+- Testing infrastructure provides 25x speedup (0.6s vs 2+ min) via proper mocking
+- Server startup optimized by 90% using existing virtual environment
+- Parallel crawling with configurable concurrency limits
+- Database operations use connection pooling for efficiency
